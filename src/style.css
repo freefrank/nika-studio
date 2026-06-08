@@ -19,7 +19,7 @@
   --border-hover: rgba(168, 85, 247, 0.4);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   background: var(--bg);

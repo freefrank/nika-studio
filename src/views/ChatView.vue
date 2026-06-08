@@ -284,7 +284,7 @@ function saveSettings() { settingsService.save(settings.value); showSettings.val
 @reference "tailwindcss";
 .input { @apply w-full bg-zinc-900/50 border border-white/5 text-[var(--text)] px-3 py-2 rounded-lg outline-none focus:border-[var(--primary)] transition-colors text-sm focus:bg-zinc-900/85; }
 .btn-primary { @apply bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-40 cursor-pointer; }
-.btn-primary-sm { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer; }
+.btn-primary-sm { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer; }
 .btn-sm { @apply bg-zinc-800/80 border border-white/5 text-[var(--text)] px-3 py-1.5 rounded-lg text-xs transition-colors hover:bg-zinc-700/80 cursor-pointer; }
 .btn-send { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20; }
 .bubble { @apply px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm; }

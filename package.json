@@ -1,7 +1,7 @@
 {
   "name": "nika-studio",
   "private": true,
-  "version": "0.2.1-audit-fix",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

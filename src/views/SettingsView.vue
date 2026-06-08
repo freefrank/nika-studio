@@ -63,5 +63,5 @@ function save() {
 @reference "tailwindcss";
 .input { @apply w-full bg-zinc-900/50 border border-white/5 text-[var(--text)] px-3.5 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] transition-all focus:bg-zinc-900/80 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-sm; }
 .btn-primary { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white transition-all; }
-h2 { @apply text-xs font-semibold uppercase tracking-wider; }
+h2 { @apply text-xs uppercase tracking-wider; }
 </style>

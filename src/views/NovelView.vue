@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+
+const props = withDefaults(defineProps<{ standalone?: boolean }>(), { standalone: true })
 import { settingsService } from '@/services/settingsService'
 import { streamChat } from '@/services/apiService'
 import { useCharacterStore } from '@/stores/characterStore'
@@ -12,6 +14,7 @@ const charStore = useCharacterStore()
 const fileContent = ref('')
 const fileName = ref('')
 const encoding = ref('auto')
+const fileInputEl = ref<HTMLInputElement | null>(null)
 const chapterRegex = ref('第[零一二三四五六七八九十百千\\d]+章')
 const chapters = ref<{ title: string; content: string }[]>([])
 const worldbook = ref<WorldBook>({ name: '', entries: [] })
@@ -255,8 +258,8 @@ const progressPct = computed(() =>
 </script>
 
 <template>
-  <div class="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up">
-    <div class="flex items-center gap-3 px-4 py-3 bg-[var(--bg-2)]/80 backdrop-blur-md border-b border-white/5 sticky top-0 z-20">
+  <div :class="standalone ? 'min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up' : 'flex flex-col h-full'">
+    <div v-if="standalone" class="flex items-center gap-3 px-4 py-3 bg-[var(--bg-2)]/80 backdrop-blur-md border-b border-white/5 sticky top-0 z-20">
       <button @click="router.push('/')" class="text-xl hover:text-[var(--primary)] transition-colors cursor-pointer">←</button>
       <span class="font-bold text-sm md:text-base tracking-wide flex-1">📚 小说转世界书</span>
     </div>
@@ -265,8 +268,8 @@ const progressPct = computed(() =>
       <!-- Upload -->
       <div @dragover.prevent @drop="onDrop"
         class="border-2 border-dashed border-white/10 hover:border-purple-500/50 bg-zinc-950/20 hover:bg-purple-500/5 rounded-2xl p-10 text-center transition-all cursor-pointer shadow-inner flex flex-col items-center justify-center min-h-[160px]"
-        @click="($refs.fileInput as HTMLInputElement).click()">
-        <input ref="fileInput" type="file" accept=".txt" class="hidden" @change="loadFile" />
+        @click="fileInputEl?.click()">
+        <input ref="fileInputEl" type="file" accept=".txt" class="hidden" @change="loadFile" />
         <p class="text-4xl mb-3">📄</p>
         <p v-if="fileName" class="font-bold text-[var(--primary)] text-sm tracking-wide">{{ fileName }}</p>
         <p v-else class="text-sm font-semibold text-[var(--text-muted)]">拖拽或点击上传 .txt 小说文件</p>

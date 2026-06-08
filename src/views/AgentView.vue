@@ -7,6 +7,7 @@ import { streamChat } from '@/services/apiService'
 import { settingsService } from '@/services/settingsService'
 import { historyService } from '@/services/historyService'
 import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import type { Character } from '@/types'
 
 const route = useRoute()
@@ -504,13 +505,12 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function renderContent(content: string) {
-  const safeContent = DOMPurify.sanitize(content)
-  // Simple: highlight json:patch blocks and html blocks
-  return safeContent
-    .replace(/```json:patch([\s\S]*?)```/g, '<pre class="patch-block">$1</pre>')
-    .replace(/```html([\s\S]*?)```/g, '<pre class="html-block">$1</pre>')
-    .replace(/```([\s\S]*?)```/g, '<pre class="code-block">$1</pre>')
-    .replace(/\n/g, '<br>')
+  // Replace special fenced blocks before markdown parsing to preserve them
+  const processed = content
+    .replace(/```json:patch([\s\S]*?)```/g, (_, body) => `<pre class="patch-block">${body.replace(/</g, '&lt;')}</pre>`)
+    .replace(/```html([\s\S]*?)```/g, (_, body) => `<pre class="html-block">${body.replace(/</g, '&lt;')}</pre>`)
+  const html = marked.parse(processed, { breaks: true }) as string
+  return DOMPurify.sanitize(html, { ADD_TAGS: ['pre'], FORCE_BODY: true })
 }
 </script>
 
@@ -591,8 +591,8 @@ function renderContent(content: string) {
 .btn-send { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20; }
 .bubble { @apply px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm; }
 .bubble-user { @apply bg-gradient-to-br from-purple-600 to-indigo-600 border border-purple-500/20 text-white rounded-tr-sm; }
-.bubble-ai { 
-  @apply bg-zinc-900/50 border border-white/5 text-zinc-100 rounded-tl-sm relative overflow-hidden pl-5;
+.bubble-ai {
+  @apply bg-zinc-900/50 border border-white/5 text-zinc-100 rounded-tl-sm relative pl-5;
 }
 .bubble-ai::before {
   content: '';
@@ -607,4 +607,18 @@ function renderContent(content: string) {
 :deep(.patch-block) { @apply bg-emerald-950/40 border border-emerald-800/30 rounded-xl p-3 text-xs text-emerald-300 overflow-x-auto my-2.5 whitespace-pre shadow-inner font-mono; }
 :deep(.html-block) { @apply bg-cyan-950/40 border border-cyan-800/30 rounded-xl p-3 text-xs text-cyan-300 overflow-x-auto my-2.5 whitespace-pre shadow-inner font-mono; }
 :deep(.code-block) { @apply bg-zinc-950/80 border border-white/5 rounded-xl p-3 text-xs text-zinc-300 overflow-x-auto my-2.5 whitespace-pre shadow-inner font-mono; }
+/* markdown rendered by marked */
+:deep(.bubble-ai p) { @apply mb-2 last:mb-0; }
+:deep(.bubble-ai strong) { @apply font-bold text-white; }
+:deep(.bubble-ai em) { @apply italic text-zinc-300; }
+:deep(.bubble-ai ul) { @apply list-disc pl-5 mb-2; }
+:deep(.bubble-ai ol) { @apply list-decimal pl-5 mb-2; }
+:deep(.bubble-ai li) { @apply mb-1; }
+:deep(.bubble-ai code) { @apply bg-black/40 rounded px-1.5 py-0.5 text-xs font-mono text-pink-400 border border-white/5; }
+:deep(.bubble-ai pre) { @apply bg-zinc-950/80 border border-white/5 rounded-xl p-3.5 overflow-x-auto text-xs font-mono mb-2.5 whitespace-pre text-zinc-300 shadow-inner; }
+:deep(.bubble-ai pre code) { @apply bg-transparent border-0 p-0; }
+:deep(.bubble-ai h1, .bubble-ai h2, .bubble-ai h3) { @apply font-bold mb-2 mt-3 text-white; }
+:deep(.bubble-ai blockquote) { @apply border-l-2 border-[var(--primary)] pl-3 italic text-zinc-400 mb-2; }
+:deep(.bubble-ai a) { @apply text-[var(--primary)] hover:underline; }
+:deep(.bubble-ai hr) { @apply border-white/5 my-3; }
 </style>
