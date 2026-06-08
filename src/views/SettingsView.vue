@@ -3,13 +3,67 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ApiConfigPanel from '@/components/ApiConfigPanel.vue'
 import { settingsService } from '@/services/settingsService'
+import { useApiConfigStore } from '@/stores/apiConfigStore'
 
 const router = useRouter()
 const settings = ref(settingsService.get())
+const apiStore = useApiConfigStore()
+const syncing = ref(false)
 
 function save() {
   settingsService.save(settings.value)
   router.push('/')
+}
+
+async function syncCloud() {
+  const username = localStorage.getItem('nika_username')
+  if (!username) {
+    alert('未登录，无法与服务器同步。')
+    return
+  }
+
+  syncing.value = true
+
+  try {
+    console.log(`[Manual Settings Sync] Fetching settings from server for user: ${username}`)
+    const res = await fetch(`/api/settings?username=${encodeURIComponent(username)}&_t=${Date.now()}`)
+    if (!res.ok) {
+      throw new Error(`服务器返回错误状态: ${res.status}`)
+    }
+
+    const data = await res.json()
+    console.log('[Manual Settings Sync] Server settings received:', data.settings)
+
+    // Sync profiles in IndexedDB & merge
+    const serverProfiles = data.settings?.apiProfiles || []
+    console.log('[Manual Settings Sync] Merging server profiles into IndexedDB...')
+    await apiStore.syncWithServer(serverProfiles)
+
+    // Merge settings
+    const serverSettings = data.settings || {}
+    const localSettings = settingsService.get()
+    const mergedSettings = {
+      ...localSettings,
+      ...serverSettings,
+      // Keep the updated profiles list from IndexedDB after merge
+      apiProfiles: apiStore.profiles,
+      activeProfileId: apiStore.activeId,
+    }
+
+    // Save locally
+    settings.value = mergedSettings
+    settingsService.save(mergedSettings)
+    
+    // Trigger update/active check on store (in case active profile details were updated)
+    await apiStore.load()
+
+    alert('同步成功！已完成双向同步。')
+  } catch (e: any) {
+    console.error('[Manual Settings Sync] Error:', e)
+    alert(`同步失败: ${e.message || e}`)
+  } finally {
+    syncing.value = false
+  }
 }
 </script>
 
@@ -21,9 +75,15 @@ function save() {
         <button @click="router.back()" class="btn-back-arrow">←</button>
         <h1 class="text-xl font-extrabold text-gradient-primary tracking-wide">⚙️ 全局设置</h1>
       </div>
-      <button @click="save" class="btn-primary py-2 px-5 text-xs font-bold rounded-xl shadow-lg shadow-purple-500/20 active:scale-95 cursor-pointer">
-        💾 保存并返回
-      </button>
+      <div class="flex items-center gap-3">
+        <button @click="syncCloud" :disabled="syncing" class="btn-secondary py-2 px-4 text-xs font-bold rounded-xl active:scale-95 cursor-pointer flex items-center gap-1.5 disabled:opacity-50 select-none">
+          <span v-if="syncing" class="w-3.5 h-3.5 border-2 border-t-transparent rounded-full animate-spin border-purple-400"></span>
+          <span>{{ syncing ? '正在同步...' : '🔄 强行同步' }}</span>
+        </button>
+        <button @click="save" class="btn-primary py-2 px-5 text-xs font-bold rounded-xl shadow-lg shadow-purple-500/20 active:scale-95 cursor-pointer">
+          💾 保存并返回
+        </button>
+      </div>
     </header>
 
     <div class="max-w-2xl mx-auto w-full p-5 flex flex-col gap-6 mt-4">
@@ -85,5 +145,5 @@ function save() {
 
 .input { @apply w-full bg-zinc-950/45 border border-white/5 text-[var(--text)] px-3.5 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] transition-all focus:bg-zinc-950/80 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-xs md:text-sm; }
 .btn-primary { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white transition-all; }
+.btn-secondary { @apply bg-zinc-950/40 hover:bg-zinc-900 border border-white/5 text-purple-400 hover:text-purple-300 transition-all cursor-pointer; }
 </style>
-
