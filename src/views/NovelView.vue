@@ -1435,6 +1435,99 @@ async function saveToLibrary() {
   router.push('/')
 }
 
+async function createIndependentCharacterCard(entry: WorldBookEntry) {
+  // Extract character name from entry.comment, e.g. "[角色] 依韵" -> "依韵"
+  const charName = entry.comment.replace(/^\[角色\]\s*/, '').trim()
+  
+  // Parse structured character card fields from entry.content
+  const parsed = parseStructuredCharacter(entry.content)
+  
+  // Create or update character card in the library
+  await charStore.load()
+  const existing = charStore.characters.find(c => c.name === charName && !c.tags.includes('世界书'))
+  
+  // Prepare description, personality, scenario, first message
+  const description = [
+    parsed.背景 ? `【背景设定】\n${parsed.背景}` : '',
+    parsed.外貌 ? `【外貌特征】\n${parsed.外貌}` : '',
+    parsed.技能 ? `【生活与战斗技能】\n${parsed.技能}` : '',
+    parsed.弱点 ? `【弱点短板】\n${parsed.弱点}` : '',
+    parsed.背景故事 ? `【背景故事】\n${parsed.背景故事}` : ''
+  ].filter(Boolean).join('\n\n')
+
+  const personality = [
+    parsed.性格 ? `【性格特质】\n${parsed.性格}` : '',
+    parsed.MBTI ? `【MBTI倾向】\n${parsed.MBTI}` : ''
+  ].filter(Boolean).join('\n\n')
+
+  const scenario = [
+    parsed.重要事件 ? `【当前故事线经历与重要转折】\n${parsed.重要事件}` : ''
+  ].filter(Boolean).join('\n\n')
+
+  const firstMes = parsed.话语示例 ? parsed.话语示例.replace(/^["'“‘]|["'”’]$/g, '') : `你好，我是${charName}。`
+  
+  if (existing) {
+    // Update existing character card
+    existing.cardData.data.name = charName
+    existing.cardData.data.description = description
+    existing.cardData.data.personality = personality
+    existing.cardData.data.scenario = scenario
+    existing.cardData.data.first_mes = firstMes
+    // Auto-update Author's Note based on latest events
+    existing.cardData.data.extensions ??= {}
+    existing.cardData.data.extensions.depth_prompt = {
+      prompt: `[当前剧情阶段：${charName}${parsed.身份 ? '（' + parsed.身份 + '）' : ''}${parsed.重要事件 ? '。最近重大事件：' + parsed.重要事件 : '已登场。'}]`,
+      depth: 4,
+      role: 'system'
+    }
+    // Link worldbook from the current state so the character has access to it!
+    existing.cardData.data.character_book = worldbook.value
+    existing.updatedAt = Date.now()
+    
+    await charStore.save(existing)
+    alert(`成功更新角色卡 [${charName}]！此卡已与最新世界书关联绑定，并且已根据当前提取结果更新了“作者附言(Author's Note)”。`)
+  } else {
+    // Create new character card
+    const char: Character = {
+      id: crypto.randomUUID(),
+      name: charName,
+      avatar: undefined,
+      tags: ['小说角色'],
+      isFavorite: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      cardData: {
+        spec: 'chara_card_v2',
+        spec_version: '2.0',
+        data: {
+          name: charName,
+          description,
+          personality,
+          scenario,
+          first_mes: firstMes,
+          mes_example: parsed.话语示例 ? `<user>: 你好\n<char>: ${parsed.话语示例}` : '',
+          creator_notes: '由 Nika Studio 从小说文本中智能生成。',
+          system_prompt: '',
+          post_history_instructions: '',
+          tags: ['从小说生成'],
+          creator: 'Nika Studio',
+          character_version: '1.0',
+          character_book: worldbook.value, // Link entire novel world book!
+          extensions: {
+            depth_prompt: {
+              prompt: `[当前剧情阶段：${charName}${parsed.身份 ? '（' + parsed.身份 + '）' : ''}${parsed.重要事件 ? '。最近重大事件：' + parsed.重要事件 : '已登场。'}]`,
+              depth: 4,
+              role: 'system'
+            }
+          }
+        }
+      }
+    }
+    await charStore.save(char)
+    alert(`成功在您的本地库创建独立角色卡 [${charName}]！此卡已与世界书关联绑定，且自动配置了初始的“作者附言(Author's Note)”，可直接导出并在 SillyTavern 中运行。`)
+  }
+}
+
 const progressPct = computed(() =>
   progress.value.total ? Math.round(progress.value.current / progress.value.total * 100) : 0
 )
@@ -1680,7 +1773,15 @@ const progressPct = computed(() =>
               class="bg-zinc-900/35 border border-white/5 rounded-2xl p-4 text-xs shadow-inner hover:border-purple-500/10 transition-all animate-fade-in flex flex-col relative overflow-hidden shrink-0">
               <div class="text-[var(--primary)] font-extrabold mb-1.5 flex items-center justify-between">
                 <span class="text-zinc-100 text-sm">{{ entry.comment || '未命名分类' }}</span>
-                <span class="text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-md font-mono">🔑 {{ entry.keys.join(', ') || '(无触发词)' }}</span>
+                <div class="flex items-center gap-2">
+                  <button v-if="entry.comment && entry.comment.startsWith('[角色]')" 
+                    @click.stop="createIndependentCharacterCard(entry)" 
+                    class="text-[9px] bg-purple-500/20 hover:bg-purple-500/35 border border-purple-500/30 text-purple-300 px-2.5 py-1.5 rounded-lg transition-all font-bold cursor-pointer select-none active:scale-95 shadow-sm"
+                  >
+                    👤 生成独立角色卡
+                  </button>
+                  <span class="text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/20 px-2.5 py-1.5 rounded-lg font-mono">🔑 {{ entry.keys.join(', ') || '(无触发词)' }}</span>
+                </div>
               </div>
               
               <div 

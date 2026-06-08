@@ -35,6 +35,22 @@ async function deleteCharacter(char: Character) {
   if (confirm(`删除角色「${char.name}」？`)) await store.remove(char.id)
 }
 
+async function cloneCharacter(char: Character) {
+  const newName = prompt(`请输入克隆角色的名称：`, `${char.name}_分身`)
+  if (newName === null) return
+  const nameToUse = newName.trim() || `${char.name}_分身`
+  
+  const cloned: Character = JSON.parse(JSON.stringify(char))
+  cloned.id = crypto.randomUUID()
+  cloned.name = nameToUse
+  cloned.cardData.data.name = nameToUse
+  cloned.createdAt = Date.now()
+  cloned.updatedAt = Date.now()
+  
+  await store.save(cloned)
+  await store.load()
+}
+
 async function importCharacter(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -156,6 +172,9 @@ async function importCharacter(e: Event) {
                 </button>
                 <button @click="editCharacter(char.id)" class="btn-sm w-full py-2 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5">
                   <span>✏️</span> 编辑
+                </button>
+                <button @click="cloneCharacter(char)" class="btn-sm w-full py-2 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5">
+                  <span>👥</span> 克隆分身
                 </button>
                 <button @click="router.push(`/agent/${char.id}`)" class="btn-sm w-full py-2 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5">
                   <span>🤖</span> AI助手

@@ -29,6 +29,14 @@ export interface CharacterData {
     avatar?: string
     alternate_greetings?: string[]
     regex_scripts?: RegexScript[]
+    extensions?: {
+      depth_prompt?: {
+        prompt: string
+        depth: number
+        role?: 'system' | 'user' | 'assistant'
+      }
+      variables?: Array<{ name: string; value: string }>
+    }
   }
 }
 

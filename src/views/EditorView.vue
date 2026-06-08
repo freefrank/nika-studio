@@ -11,7 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useCharacterStore()
 
-const activeTab = ref<'basic' | 'dialogue' | 'greetings' | 'meta' | 'worldbook' | 'regex'>('basic')
+const activeTab = ref<'basic' | 'dialogue' | 'greetings' | 'meta' | 'worldbook' | 'regex' | 'growth'>('basic')
 const saving = ref(false)
 const aiLoading = ref<string | null>(null)
 const translateLoading = ref(false)
@@ -83,6 +83,124 @@ function removeWbEntry(id: string) {
 }
 function wbKeys(entry: WorldBookEntry) { return entry.keys.join(', ') }
 function updateWbKeys(entry: WorldBookEntry, val: string) { entry.keys = val.split(',').map(s => s.trim()).filter(Boolean) }
+// ── 成长与附言管理 ──────────────────────────────────────────────
+const depthPromptPrompt = computed({
+  get() {
+    return d.value.extensions?.depth_prompt?.prompt || ''
+  },
+  set(val: string) {
+    d.value.extensions ??= {}
+    d.value.extensions.depth_prompt ??= { prompt: '', depth: 4, role: 'system' }
+    d.value.extensions.depth_prompt.prompt = val
+  }
+})
+
+const depthPromptDepth = computed({
+  get() {
+    return d.value.extensions?.depth_prompt?.depth ?? 4
+  },
+  set(val: number) {
+    d.value.extensions ??= {}
+    d.value.extensions.depth_prompt ??= { prompt: '', depth: 4, role: 'system' }
+    d.value.extensions.depth_prompt.depth = val
+  }
+})
+
+const depthPromptRole = computed({
+  get() {
+    return d.value.extensions?.depth_prompt?.role || 'system'
+  },
+  set(val: 'system' | 'user' | 'assistant') {
+    d.value.extensions ??= {}
+    d.value.extensions.depth_prompt ??= { prompt: '', depth: 4, role: 'system' }
+    d.value.extensions.depth_prompt.role = val
+  }
+})
+
+const customVariables = computed(() => {
+  return d.value.extensions?.variables || []
+})
+
+function addVariable() {
+  d.value.extensions ??= {}
+  d.value.extensions.variables ??= []
+  d.value.extensions.variables.push({ name: '', value: '' })
+}
+
+function removeVariable(index: number) {
+  if (d.value.extensions?.variables) {
+    d.value.extensions.variables.splice(index, 1)
+  }
+}
+
+async function cloneAsPhase() {
+  const newName = prompt(`请输入克隆的新角色卡/阶段名称：`, `${d.value.name || '新角色'}_阶段`)
+  if (newName === null) return
+  const nameToUse = newName.trim() || `${d.value.name || '新角色'}_阶段`
+  
+  const cloned: Character = JSON.parse(JSON.stringify(char.value))
+  cloned.id = crypto.randomUUID()
+  cloned.name = nameToUse
+  cloned.cardData.data.name = nameToUse
+  cloned.createdAt = Date.now()
+  cloned.updatedAt = Date.now()
+  
+  await store.save(cloned)
+  alert(`成功克隆角色卡「${nameToUse}」！已在角色库中生成了新的分身。`)
+  router.push('/')
+}
+
+async function runPrune() {
+  const cfg = settingsService.get().apiConfig
+  if (!cfg.apiKey && cfg.provider !== 'local') { alert('请先在设置中配置API Key'); return }
+  
+  const confirmPrune = confirm("AI 将基于该角色的当前状态，合并、精简、去重其「基础描述」与「性格特质」，剔除陈旧的过渡性过气设定（例如早期微不足道的琐碎事件），并在 Scenario/当前情境中突出当前阶段的重心。这会直接覆盖您现有的描述、性格与情境，是否继续？")
+  if (!confirmPrune) return
+  
+  aiLoading.value = 'prune'
+  const prompt = `你是一个专业的角色设定剪枝与整理助手。由于该角色经历了长篇小说的多个篇章，目前的信息有些杂乱、臃肿。
+请基于角色底层的静态性格和当前篇章所处的背景，对以下设定字段进行**剪枝与重构**：
+
+要求：
+1. **静态底层保留**：保留不可动摇的底层性格特质、核心经历。
+2. **剔除陈旧/过渡性设定**：精简或移除曾经在早期发生、但对当前阶段已毫无影响的琐碎人际关系、旧装备或过渡任务（例如：早已结束的新手村恩怨，过期的临时同行状态）。
+3. **字数与Token优化**：合并同类项，消除重复描述，使语言极其洗练，控制总体Tokens占用在最有效率的范围内。
+4. **格式输出**：以JSON格式输出重构后的字段，不要 Markdown 代码块包裹，也不要其他解释文字，确保是一个有效的 JSON 字符串，包含以下字段：
+{
+  "description": "洗练重构后的基础描述（外貌、背景、技能等，建议分段或使用-列表）",
+  "personality": "洗练重构后的性格特质（MBTI、底层性格等）",
+  "scenario": "当前最新的处境/人际关系与短期目标"
+}
+只输出 JSON，不要其他任何说明。
+
+---
+当前角色名称：${d.value.name}
+原【基础描述(Description)】：
+${d.value.description || '（空）'}
+
+原【性格特质(Personality)】：
+${d.value.personality || '（空）'}
+
+原【当前情境(Scenario)】：
+${d.value.scenario || '（空）'}
+`
+
+  try {
+    const result = await chat(cfg, [{ role: 'user', content: prompt }])
+    const match = result.match(/\{[\s\S]*\}/)
+    if (!match) throw new Error('无法解析AI响应：' + result)
+    const data = JSON.parse(match[0])
+    if (data.description) d.value.description = data.description
+    if (data.personality) d.value.personality = data.personality
+    if (data.scenario) d.value.scenario = data.scenario
+    alert('✨ AI 智能设定剪枝与瘦身完成！字段已完成合并与更新。')
+  } catch (e) {
+    alert('设定剪枝失败: ' + (e as Error).message)
+  } finally {
+    aiLoading.value = null
+  }
+}
+
 
 async function save() {
   saving.value = true
@@ -318,7 +436,7 @@ function injectBeautifyStyle(style: string) {
         <!-- Sidebar Navigation (Desktop vertical tabs, mobile hides this and uses top tabs) -->
         <nav class="hidden md:flex flex-col gap-1.5">
           <span class="text-[10px] font-bold text-zinc-500 px-3 uppercase tracking-wider mb-1">编辑器菜单</span>
-          <button v-for="(label, key) in { basic:'📝 基础信息', dialogue:'💬 对话设定', greetings:'👋 问候用语', meta:'🏷️ 元数信息', worldbook:'🔮 世界设定', regex:'⚙️ 正则脚本' }"
+          <button v-for="(label, key) in { basic:'📝 基础信息', dialogue:'💬 对话设定', greetings:'👋 问候用语', meta:'🏷️ 元数信息', worldbook:'🔮 世界设定', regex:'⚙️ 正则脚本', growth:'🌱 成长附言' }"
             :key="key" @click="activeTab = key as typeof activeTab"
             class="tab-vertical" :class="{ active: activeTab === key }">
             {{ label }}
@@ -330,7 +448,7 @@ function injectBeautifyStyle(style: string) {
       <main class="flex-1 overflow-y-auto flex flex-col">
         <!-- Mobile Horizontal Tab Bar -->
         <div class="md:hidden flex gap-1 p-2 border-b border-white/5 sticky top-0 bg-[var(--bg)]/95 backdrop-blur-md z-10 overflow-x-auto select-none shrink-0">
-          <button v-for="(label, key) in { basic:'📝 基础', dialogue:'💬 对话', greetings:'👋 问候', meta:'🏷️ 元数据', worldbook:'🔮 世界书', regex:'⚙️ 正则' }"
+          <button v-for="(label, key) in { basic:'📝 基础', dialogue:'💬 对话', greetings:'👋 问候', meta:'🏷️ 元数据', worldbook:'🔮 世界书', regex:'⚙️ 正则', growth:'🌱 成长' }"
             :key="key" @click="activeTab = key as typeof activeTab"
             class="tab-capsule" :class="{ active: activeTab === key }">
             {{ label }}
@@ -553,6 +671,116 @@ function injectBeautifyStyle(style: string) {
                   </div>
                 </div>
               </div>
+            </div>
+          </template>
+
+          <!-- Growth & Author's Note Tab -->
+          <template v-if="activeTab === 'growth'">
+            <div class="flex flex-col gap-6">
+              
+              <!-- Segment Control Section -->
+              <div class="glass-card p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <h3 class="text-sm font-extrabold text-purple-300 flex items-center gap-1.5">
+                  <span>🌱</span> 角色随剧情成长与规划控制
+                </h3>
+                <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+                  长篇小说中角色处于不断变化中。系统提供“多阶段克隆”和“AI设定瘦身剪枝”等手段，使角色保持鲜活且不撑爆大模型的上下文窗口。
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mt-2">
+                  <!-- Clone Phase Button -->
+                  <div class="bg-zinc-950/40 p-4 rounded-xl border border-white/5 flex flex-col justify-between items-start gap-2.5">
+                    <div class="flex flex-col">
+                      <span class="text-xs font-bold text-zinc-200">👥 分阶段克隆 (Phase Clone)</span>
+                      <span class="text-[10px] text-[var(--text-muted)] mt-1">创建角色在当前大篇章的分身存档，克隆后可独立更新各篇章心态与技能设定。</span>
+                    </div>
+                    <button @click="cloneAsPhase" class="btn-action-outline px-4 py-2 text-xs font-bold rounded-xl select-none">
+                      克隆此卡作为新阶段
+                    </button>
+                  </div>
+                  
+                  <!-- Pruning Tool -->
+                  <div class="bg-zinc-950/40 p-4 rounded-xl border border-white/5 flex flex-col justify-between items-start gap-2.5">
+                    <div class="flex flex-col">
+                      <span class="text-xs font-bold text-zinc-200">✨ AI 设定剪枝与瘦身 (Pruning)</span>
+                      <span class="text-[10px] text-[var(--text-muted)] mt-1">分析角色的当前状态，合并精简琐碎或早已结束的过渡设定（如新手村恩怨），缩减 Token 占用。</span>
+                    </div>
+                    <button @click="runPrune" :disabled="aiLoading === 'prune'" class="btn-action-outline px-4 py-2 text-xs font-bold rounded-xl select-none">
+                      <span v-if="aiLoading === 'prune'" class="inline-block animate-spin mr-1">⏳</span>
+                      智能清理陈旧设定
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Author's Note Section -->
+              <div class="glass-card p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <div class="flex justify-between items-start">
+                  <div class="flex flex-col">
+                    <h3 class="text-sm font-extrabold text-purple-300 flex items-center gap-1.5">
+                      <span>📌</span> 作者附言 (Author's Note)
+                    </h3>
+                    <span class="text-[10px] text-[var(--text-muted)] mt-1">SillyTavern兼容。在对话末尾动态插入角色的短期处境、武功等级或精神状态，极高权重控制AI当前行为。</span>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div class="field md:col-span-2">
+                    <label>附言内容 (Prompt)</label>
+                    <textarea v-model="depthPromptPrompt" class="input resize-y" rows="3" placeholder="例如：[当前剧情阶段: 依韵已加入武当派，并在恨天洞被杀清零武功复活，心境极其隐忍、冷酷...]" />
+                  </div>
+                  <div class="flex flex-col gap-4">
+                    <div class="field">
+                      <label>注入深度 (Depth)</label>
+                      <input type="number" v-model.number="depthPromptDepth" min="0" max="100" class="input" placeholder="默认推荐为 4" />
+                    </div>
+                    <div class="field">
+                      <label>角色类型 (Role)</label>
+                      <select v-model="depthPromptRole" class="input py-2">
+                        <option value="system">System (系统指令 - 推荐)</option>
+                        <option value="user">User (用户气泡)</option>
+                        <option value="assistant">Assistant (AI回复气泡)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Variables Section -->
+              <div class="glass-card p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <div class="flex justify-between items-center">
+                  <div class="flex flex-col">
+                    <h3 class="text-sm font-extrabold text-purple-300 flex items-center gap-1.5">
+                      <span>📊</span> 自定义成长变量 (Character Variables)
+                    </h3>
+                    <span class="text-[10px] text-[var(--text-muted)] mt-1">SillyTavern兼容。在设定/系统指令中使用 <code class="bg-black/30 text-purple-300 px-1 py-0.5 rounded font-mono text-[10px]">&#123;&#123;var::变量名&#125;&#125;</code> 引用，修改变量值可直接更新大模型脑中数据。</span>
+                  </div>
+                  <button @click="addVariable" class="btn-sm font-bold text-xs py-1.5 px-3 rounded-lg">+ 新增变量</button>
+                </div>
+
+                <div v-if="!customVariables.length" class="text-center text-[var(--text-muted)] py-8 border border-dashed border-white/5 rounded-xl">
+                  <span class="text-xl block mb-1">📊</span>
+                  <p class="text-[10px] font-medium">暂无自定义变量，点击右上角按钮添加</p>
+                </div>
+
+                <div v-else class="flex flex-col gap-3">
+                  <div v-for="(v, index) in customVariables" :key="index" class="flex items-center gap-3 bg-zinc-950/40 p-3 rounded-xl border border-white/5 animate-fade-in">
+                    <div class="flex-1 grid grid-cols-2 gap-3">
+                      <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-purple-400 font-bold font-mono">KEY</span>
+                        <input v-model="v.name" class="input input-key py-1.5 text-xs font-mono" placeholder="如 money, softsword..." />
+                      </div>
+                      <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400 font-bold font-mono">VAL</span>
+                        <input v-model="v.value" class="input input-key py-1.5 text-xs" placeholder="如 500万两, 50级..." />
+                      </div>
+                    </div>
+                    <button @click="removeVariable(index)" class="text-red-400 hover:text-red-300 text-sm p-1.5 hover:bg-white/5 rounded-lg transition-colors">
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </template>
         </div>
