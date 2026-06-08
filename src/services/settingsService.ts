@@ -21,6 +21,14 @@ export const settingsService = {
 
   save(settings: AppSettings): void {
     localStorage.setItem(KEY, JSON.stringify(settings))
+    const username = localStorage.getItem('nika_username')
+    if (username) {
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, settings })
+      }).catch(err => console.warn('Failed to sync settings to server:', err))
+    }
   },
 
   update(patch: Partial<AppSettings>): void {

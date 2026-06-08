@@ -711,11 +711,20 @@ ${seg}
   return prompt
 }
 
+function getUsername(): string {
+  return localStorage.getItem('nika_username') || ''
+}
+
 async function saveStateToServer(state: any): Promise<boolean> {
+  const user = getUsername()
+  if (!user) return false
   try {
     const res = await fetch('/api/novel-state', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-User': user
+      },
       body: JSON.stringify(state)
     })
     return res.ok
@@ -726,8 +735,10 @@ async function saveStateToServer(state: any): Promise<boolean> {
 }
 
 async function getStateFromServer(): Promise<any> {
+  const user = getUsername()
+  if (!user) return null
   try {
-    const res = await fetch('/api/novel-state')
+    const res = await fetch(`/api/novel-state?username=${encodeURIComponent(user)}`)
     if (res.ok) {
       return await res.json()
     }
@@ -738,8 +749,10 @@ async function getStateFromServer(): Promise<any> {
 }
 
 async function clearStateOnServer(): Promise<boolean> {
+  const user = getUsername()
+  if (!user) return false
   try {
-    const res = await fetch('/api/novel-state', {
+    const res = await fetch(`/api/novel-state?username=${encodeURIComponent(user)}`, {
       method: 'DELETE'
     })
     return res.ok
