@@ -966,10 +966,7 @@ async function saveStateToServer(state: any): Promise<boolean> {
   try {
     const res = await fetch('/api/novel-state', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-User': user
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state)
     })
     return res.ok
@@ -983,7 +980,7 @@ async function getStateFromServer(): Promise<any> {
   const user = getUsername()
   if (!user) return null
   try {
-    const res = await fetch(`/api/novel-state?username=${encodeURIComponent(user)}`)
+    const res = await fetch('/api/novel-state')
     if (res.ok) {
       return await res.json()
     }
@@ -997,7 +994,7 @@ async function clearStateOnServer(): Promise<boolean> {
   const user = getUsername()
   if (!user) return false
   try {
-    const res = await fetch(`/api/novel-state?username=${encodeURIComponent(user)}`, {
+    const res = await fetch('/api/novel-state', {
       method: 'DELETE'
     })
     return res.ok

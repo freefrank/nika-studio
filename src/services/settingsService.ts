@@ -27,7 +27,7 @@ export const settingsService = {
       fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, settings })
+        body: JSON.stringify({ settings })
       })
       .then(res => {
         if (res.ok) {

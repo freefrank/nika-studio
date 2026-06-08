@@ -46,7 +46,7 @@ function openaiUrl(cfg: ApiConfig) {
 }
 
 function applyProxy(url: string, useProxy?: boolean): string {
-  if (!useProxy) return url
+  if (!useProxy || import.meta.env.VITE_ENABLE_DEV_PROXY !== 'true') return url
   const match = url.match(/^(https?):\/\/(.+)$/)
   if (match) {
     return `/proxy/${match[1]}/${match[2]}`
@@ -135,4 +135,3 @@ export async function testConnection(cfg: ApiConfig): Promise<string> {
   const reply = json.choices?.[0]?.message?.content
   return reply || '(无回复内容)'
 }
-

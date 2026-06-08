@@ -14,13 +14,23 @@ const password = ref('')
 const errorMsg = ref('')
 const loading = ref(false)
 
-const syncSettings = async (user: string) => {
-  console.log(`[Settings Sync] Fetching settings from server for user: ${user}`)
+const clearLocalLogin = () => {
+  localStorage.removeItem('nika_username')
+  currentUsername.value = ''
+  isLoggedIn.value = false
+}
+
+const syncSettings = async () => {
+  console.log('[Settings Sync] Fetching settings from server for active session')
   try {
     // Add cache buster query parameter to bypass potential reverse-proxy/browser cache
-    const res = await fetch(`/api/settings?username=${encodeURIComponent(user)}&_t=${Date.now()}`)
+    const res = await fetch(`/api/settings?_t=${Date.now()}`)
     if (res.ok) {
       const data = await res.json()
+      if (data.username) {
+        currentUsername.value = data.username
+        localStorage.setItem('nika_username', data.username)
+      }
       if (data.settings) {
         console.log('[Settings Sync] Settings downloaded successfully')
         localStorage.setItem('nika_settings', JSON.stringify(data.settings))
@@ -42,6 +52,9 @@ const syncSettings = async (user: string) => {
       } else {
         console.log('[Settings Sync] No settings returned by server.')
       }
+      isLoggedIn.value = true
+    } else if (res.status === 401) {
+      clearLocalLogin()
     } else {
       console.warn(`[Settings Sync] Server returned non-ok status: ${res.status}`)
     }
@@ -54,8 +67,7 @@ onMounted(() => {
   const storedUser = localStorage.getItem('nika_username')
   if (storedUser) {
     currentUsername.value = storedUser
-    isLoggedIn.value = true
-    syncSettings(storedUser)
+    syncSettings()
   }
 })
 
@@ -102,7 +114,7 @@ const handleLogin = async () => {
           await fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username.value.trim(), settings: parsed })
+            body: JSON.stringify({ settings: parsed })
           })
           console.log('[Settings Sync] Successfully migrated local settings and profiles to server.')
         } catch (e) {
@@ -123,8 +135,9 @@ const handleLogin = async () => {
   }
 }
 
-const logout = () => {
-  localStorage.removeItem('nika_username')
+const logout = async () => {
+  await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+  clearLocalLogin()
   window.location.reload()
 }
 </script>
@@ -189,7 +202,7 @@ const logout = () => {
 
         <!-- Tooltip -->
         <p class="text-[9px] leading-relaxed text-zinc-500 px-1 select-none border-t border-white/5 pt-4 mt-2">
-          💡 <strong>首次登录提示</strong>：本系统采用自动发现机制。如果是首次使用该账户名，直接输入密码即可登录，后台会自动注册为您的唯一登录凭证。
+          💡 <strong>登录提示</strong>：公网部署请先在服务器端初始化账户；本地调试可临时启用首次注册开关。
         </p>
       </div>
     </div>

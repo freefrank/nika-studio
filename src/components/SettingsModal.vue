@@ -28,7 +28,7 @@ async function syncCloud() {
 
   try {
     console.log(`[Manual Settings Sync] Fetching settings from server for user: ${username}`)
-    const res = await fetch(`/api/settings?username=${encodeURIComponent(username)}&_t=${Date.now()}`)
+    const res = await fetch(`/api/settings?_t=${Date.now()}`)
     if (!res.ok) {
       throw new Error(`服务器返回错误状态: ${res.status}`)
     }
