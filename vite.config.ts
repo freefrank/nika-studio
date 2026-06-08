@@ -13,6 +13,7 @@ export default defineConfig({
       '/proxy': {
         target: 'http://localhost',
         changeOrigin: true,
+        secure: false,
         router: (req: any) => {
           const match = req.url?.match(/^\/proxy\/(https?)\/([^/]+)/)
           if (match) {
