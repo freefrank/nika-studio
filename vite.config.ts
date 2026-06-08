@@ -41,6 +41,69 @@ function stateServerPlugin() {
           }
         }
 
+        if (pathname.startsWith('/proxy/')) {
+          const match = pathname.match(/^\/proxy\/(https?)\/([^/]+)(.*)$/)
+          if (match) {
+            const protocol = match[1]
+            const host = match[2]
+            const rest = match[3]
+            const search = url.search
+            
+            const targetUrl = `${protocol}://${host}${rest}${search}`
+            console.log(`[Proxy Server] Forwarding request to: ${targetUrl}`)
+            
+            const headers: Record<string, string> = {}
+            for (const [key, val] of Object.entries(req.headers)) {
+              if (val && !['host', 'connection', 'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform'].includes(key.toLowerCase())) {
+                headers[key] = Array.isArray(val) ? val.join(', ') : (val as string)
+              }
+            }
+            
+            let body: Buffer | undefined = undefined
+            if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+              const chunks: any[] = []
+              for await (const chunk of req) {
+                chunks.push(chunk)
+              }
+              body = Buffer.concat(chunks)
+            }
+            
+            try {
+              const controller = new AbortController()
+              req.on('close', () => controller.abort())
+              
+              const proxyRes = await fetch(targetUrl, {
+                method: req.method,
+                headers,
+                body,
+                signal: controller.signal,
+              })
+              
+              res.writeHead(proxyRes.status, {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-User',
+                'Content-Type': proxyRes.headers.get('content-type') || 'application/json',
+              })
+              
+              if (proxyRes.body) {
+                const reader = proxyRes.body.getReader()
+                while (true) {
+                  const { done, value } = await reader.read()
+                  if (done) break
+                  res.write(value)
+                }
+              }
+              res.end()
+            } catch (err: any) {
+              console.error(`[Proxy Server] Forwarding error for ${targetUrl}:`, err)
+              res.writeHead(502, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: 'Proxy failed', message: err.message }))
+            }
+            return
+          }
+        }
+
         if (pathname === '/api/auth/login' && req.method === 'POST') {
           let body = ''
           req.on('data', (chunk: any) => { body += chunk })
@@ -206,33 +269,5 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     allowedHosts: ['nika.zkx.ca'],
-    proxy: {
-      '/proxy/https': {
-        target: 'https://localhost',
-        changeOrigin: true,
-        secure: false,
-        router: (req: any) => {
-          const match = req.url?.match(/^\/proxy\/https\/([^/]+)/)
-          if (match) {
-            return `https://${match[1]}`
-          }
-          return 'https://localhost'
-        },
-        rewrite: (path: string) => path.replace(/^\/proxy\/https\/[^/]+/, ''),
-      } as any,
-      '/proxy/http': {
-        target: 'http://localhost',
-        changeOrigin: true,
-        secure: false,
-        router: (req: any) => {
-          const match = req.url?.match(/^\/proxy\/http\/([^/]+)/)
-          if (match) {
-            return `http://${match[1]}`
-          }
-          return 'http://localhost'
-        },
-        rewrite: (path: string) => path.replace(/^\/proxy\/http\/[^/]+/, ''),
-      } as any,
-    },
   },
 })
