@@ -87,3 +87,37 @@ export async function chat(
   await streamChat(cfg, messages, d => { full += d }, signal)
   return full
 }
+
+export async function testConnection(cfg: ApiConfig): Promise<string> {
+  const messages = [{ role: 'user', content: '回复HI' }]
+  if (cfg.provider === 'gemini') {
+    const body: Record<string, unknown> = {
+      contents: messages.map(m => ({ role: 'user', parts: [{ text: m.content }] }))
+    }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent?key=${cfg.apiKey}`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`)
+    const json = await res.json()
+    const reply = json.candidates?.[0]?.content?.parts?.[0]?.text
+    return reply || '(无回复内容)'
+  }
+
+  const url = openaiUrl(cfg)
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json', 
+      'Authorization': `Bearer ${cfg.apiKey}` 
+    },
+    body: JSON.stringify({ model: cfg.model, messages, stream: false }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`)
+  const json = await res.json()
+  const reply = json.choices?.[0]?.message?.content
+  return reply || '(无回复内容)'
+}
+

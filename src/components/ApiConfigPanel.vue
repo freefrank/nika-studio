@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useApiConfigStore, type ApiProfile } from '@/stores/apiConfigStore'
-import { chat } from '@/services/apiService'
+import { testConnection } from '@/services/apiService'
 
 const store = useApiConfigStore()
 const editing = ref<ApiProfile | null>(null)
@@ -67,10 +67,10 @@ async function testConfig() {
   testLoading.value = true
   testResult.value = null
   try {
-    const reply = await chat(editing.value, [{ role: 'user', content: '回复HI' }])
+    const reply = await testConnection(editing.value)
     testResult.value = {
       success: true,
-      message: reply || '(连接成功，无返回内容)'
+      message: reply
     }
   } catch (e) {
     testResult.value = {
