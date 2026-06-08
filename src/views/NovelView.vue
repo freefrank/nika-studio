@@ -274,162 +274,187 @@ const progressPct = computed(() =>
       <span class="font-extrabold text-sm md:text-base tracking-wide text-gradient-primary flex-1">📚 小说转世界书 (Novel to Lorebook)</span>
     </header>
 
-    <div class="flex-1 max-w-4xl mx-auto w-full p-5 flex flex-col gap-6">
-      <!-- Upload Drop Zone -->
-      <div @dragover.prevent @drop="onDrop"
-        class="group border-2 border-dashed border-white/10 hover:border-purple-500/40 bg-zinc-950/20 hover:bg-purple-500/5 rounded-2xl p-10 text-center transition-all duration-300 cursor-pointer shadow-inner flex flex-col items-center justify-center min-h-[180px] hover:scale-[1.005]"
-        @click="fileInputEl?.click()">
-        <input ref="fileInputEl" type="file" accept=".txt" class="hidden" @change="loadFile" />
-        <span class="text-5xl mb-3 block transform group-hover:scale-110 transition-transform duration-300">📄</span>
-        <p v-if="fileName" class="font-extrabold text-[var(--primary)] text-sm tracking-wide bg-purple-500/5 border border-purple-500/20 py-1.5 px-4 rounded-xl shadow-sm">{{ fileName }}</p>
-        <p v-else class="text-sm font-bold text-zinc-300 group-hover:text-purple-300 transition-colors">拖拽或点击上传小说 .txt 文件</p>
-        <p v-if="fileContent" class="text-[10px] text-[var(--text-muted)] mt-2 font-mono bg-zinc-950/40 border border-white/5 px-2.5 py-1 rounded-md">{{ fileContent.length.toLocaleString() }} 字符</p>
-      </div>
-
-      <!-- Options Configuration Grid -->
-      <div class="glass-card rounded-2xl p-5 border border-white/5 grid grid-cols-1 md:grid-cols-4 gap-4 shadow-md">
-        <div class="flex flex-col gap-1.5">
-          <label class="label">文件编码</label>
-          <select v-model="encoding" class="input cursor-pointer bg-zinc-950">
-            <option v-for="e in encodings" :key="e" :value="e" class="bg-zinc-950">{{ e === 'auto' ? '自动检测' : e }}</option>
-          </select>
-        </div>
+    <div class="flex-1 max-w-7xl mx-auto w-full p-5 flex flex-col lg:flex-row gap-6 items-start animate-fade-in">
+      <!-- Left Column: Inputs & Controls (Sticky on Desktop) -->
+      <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-4 lg:sticky lg:top-20">
         
-        <div class="flex flex-col gap-1.5 md:col-span-2">
-          <label class="label">章节识别正则 (Regex)</label>
-          <div class="flex gap-2">
-            <input v-model="chapterRegex" class="input flex-1 font-mono text-xs" />
-            <button @click="detectChapters" :disabled="!fileContent" class="btn-secondary whitespace-nowrap text-xs font-bold px-3.5 rounded-xl">识别章节</button>
-          </div>
+        <!-- Upload Drop Zone -->
+        <div @dragover.prevent @drop="onDrop"
+          class="group border-2 border-dashed border-white/10 hover:border-purple-500/40 bg-zinc-950/20 hover:bg-purple-500/5 rounded-2xl p-6 text-center transition-all duration-300 cursor-pointer shadow-inner flex flex-col items-center justify-center min-h-[140px] hover:scale-[1.005]"
+          @click="fileInputEl?.click()">
+          <input ref="fileInputEl" type="file" accept=".txt" class="hidden" @change="loadFile" />
+          <span class="text-4xl mb-2 block transform group-hover:scale-110 transition-transform duration-300">📄</span>
+          <p v-if="fileName" class="font-extrabold text-[var(--primary)] text-[11px] tracking-wide bg-purple-500/5 border border-purple-500/20 py-1 px-3 rounded-lg shadow-sm truncate max-w-full">{{ fileName }}</p>
+          <p v-else class="text-xs font-bold text-zinc-300 group-hover:text-purple-300 transition-colors">拖拽或点击上传小说 .txt 文件</p>
+          <p v-if="fileContent" class="text-[9px] text-[var(--text-muted)] mt-1.5 font-mono bg-zinc-950/40 border border-white/5 px-2 py-0.5 rounded">{{ fileContent.length.toLocaleString() }} 字符</p>
         </div>
-        
-        <div class="flex flex-col gap-1.5">
-          <label class="label">分段字数大小</label>
-          <select v-model="splitSize" class="input cursor-pointer bg-zinc-950">
-            <option :value="1500" class="bg-zinc-950">1500字</option>
-            <option :value="3000" class="bg-zinc-950">3000字</option>
-            <option :value="5000" class="bg-zinc-950">5000字</option>
-          </select>
-        </div>
-      </div>
 
-      <!-- Incremental Mode Banner -->
-      <div class="glass-card rounded-2xl p-4 border border-white/5 flex items-center justify-between shadow-sm">
-        <div class="flex items-center gap-3">
-          <span class="text-xl">🔄</span>
-          <div class="flex flex-col">
-            <span class="text-xs font-bold text-zinc-100">智能增量提取模式</span>
-            <span class="text-[10px] text-[var(--text-muted)]">开启后将自动跳过已存在的同名/同关键词条目，仅做内容更新</span>
-          </div>
-        </div>
-        <label class="relative inline-flex items-center cursor-pointer select-none">
-          <input type="checkbox" v-model="incrementalMode" class="accent-[var(--primary)] w-4 h-4" />
-        </label>
-      </div>
-
-      <!-- Categories Configuration -->
-      <div class="glass-card rounded-2xl overflow-hidden border border-white/5 shadow-sm">
-        <button @click="showCategories = !showCategories"
-          class="w-full px-5 py-4 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 bg-zinc-900/10">
-          <span class="flex items-center gap-1.5">📂 提取范畴配置（{{ categories.filter(c=>c.enabled).length }}/{{ categories.length }} 启用）</span>
-          <span>{{ showCategories ? '▲ 收起' : '▼ 展开' }}</span>
-        </button>
-        
-        <div v-if="showCategories" class="px-5 pb-5 flex flex-col gap-3 pt-3">
-          <div v-for="(cat, i) in categories" :key="cat.name"
-            class="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
-            <label class="flex items-center gap-2 shrink-0 cursor-pointer">
-              <input type="checkbox" v-model="cat.enabled" class="accent-[var(--primary)] w-4 h-4" />
-              <span class="text-xs font-bold text-zinc-200 w-16">{{ cat.name }}</span>
-            </label>
-            <input v-model="cat.guide" class="input flex-1 py-1.5 text-xs" placeholder="提取指导..." />
-            <button v-if="!['角色','地点','组织'].includes(cat.name)"
-              @click="removeCategory(i)" class="text-red-400 hover:text-red-300 text-xs shrink-0 cursor-pointer p-1">✕</button>
+        <!-- Options Configuration -->
+        <div class="glass-card rounded-2xl p-4 border border-white/5 flex flex-col gap-3 shadow-md">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="flex flex-col gap-1">
+              <label class="label">文件编码</label>
+              <select v-model="encoding" class="input cursor-pointer bg-zinc-950 py-2 text-xs">
+                <option v-for="e in encodings" :key="e" :value="e" class="bg-zinc-950">{{ e === 'auto' ? '自动检测' : e }}</option>
+              </select>
+            </div>
+            
+            <div class="flex flex-col gap-1">
+              <label class="label">分段字数限制</label>
+              <select v-model="splitSize" class="input cursor-pointer bg-zinc-950 py-2 text-xs">
+                <option :value="1500" class="bg-zinc-950">1500字</option>
+                <option :value="3000" class="bg-zinc-950">3000字</option>
+                <option :value="5000" class="bg-zinc-950">5000字</option>
+              </select>
+            </div>
           </div>
           
-          <!-- Add category -->
-          <div class="flex gap-2 mt-3 pt-3 border-t border-white/5">
-            <input v-model="newCatName" @keydown.enter.prevent="addCategory"
-              class="input flex-1 text-xs" placeholder="新增设定分类 (例如: 武器、法宝)..." />
-            <button @click="addCategory" class="btn-secondary text-xs px-4 rounded-xl font-bold">+ 添加分类</button>
-            <button @click="categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES))"
-              class="btn-secondary text-xs px-4 rounded-xl font-bold text-zinc-400 border-dashed">重置默认</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Chapters Preview -->
-      <div v-if="chapters.length" class="glass-card rounded-2xl p-5 border border-white/5 shadow-sm animate-fade-in">
-        <h4 class="text-[10px] font-bold text-zinc-400 mb-3 uppercase tracking-wider">自动识别到 {{ chapters.length }} 个章节</h4>
-        <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
-          <span v-for="(c, idx) in chapters.slice(0, 20)" :key="c.title + '-' + idx" class="text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2.5 py-1 rounded-lg">{{ c.title }}</span>
-          <span v-if="chapters.length > 20" class="text-xs text-[var(--text-muted)] flex items-center pl-1 font-bold">...等其余 {{ chapters.length - 20 }} 个章节</span>
-        </div>
-      </div>
-
-      <!-- Action Button -->
-      <div class="flex gap-3 shrink-0">
-        <button @click="generateWorldbook" :disabled="!fileContent || processing" class="btn-primary flex-1 py-3 text-sm font-extrabold shadow-lg shadow-purple-500/20">
-          🔮 开始 AI 智能解析世界设定
-        </button>
-        <button v-if="processing" @click="stopProcessing" class="btn-danger py-3 text-sm font-extrabold px-6 rounded-xl shadow-lg shadow-red-500/10">
-          ■ 停止生成
-        </button>
-      </div>
-
-      <!-- Progress Tracking & LLM Streams -->
-      <div v-if="processing || progress.total > 0" class="glass-card p-5 rounded-2xl border border-white/5 shadow-sm animate-fade-in flex flex-col gap-4">
-        <!-- Progress Bar Header -->
-        <div class="flex justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-          <span>{{ processing ? 'AI 正在全力提取剧情中...' : '设定提取已完成' }} (已处理：{{ progress.current }}/{{ progress.total }})</span>
-          <span class="text-purple-400 font-mono font-bold">{{ progressPct }}%</span>
-        </div>
-        <div class="h-2.5 bg-zinc-950 rounded-full overflow-hidden border border-white/5 shadow-inner">
-          <div class="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 transition-all duration-300 animate-pulse" :style="{ width: progressPct + '%' }" />
-        </div>
-
-        <!-- Prompt vs Response Grid -->
-        <div v-if="processing && (currentPrompt || currentResponse)" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 border-t border-white/5 pt-4 animate-fade-in">
-          <!-- Left Column: Prompt -->
-          <div class="flex flex-col gap-1.5 min-w-0">
-            <h5 class="text-[9px] font-extrabold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-              <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-              <span>发送给大模型的 Prompt (片段 {{ progress.current }})</span>
-            </h5>
-            <textarea readonly :value="currentPrompt" class="input font-mono text-[10px] leading-relaxed resize-none h-48 bg-zinc-950/60 text-zinc-300 border border-white/5 scroll-thin" />
-          </div>
-
-          <!-- Right Column: Streaming Response -->
-          <div class="flex flex-col gap-1.5 min-w-0">
-            <h5 class="text-[9px] font-extrabold text-purple-400 uppercase tracking-widest flex items-center gap-1.5">
-              <span class="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
-              <span>大模型实时回复 (Streaming JSON Response)</span>
-            </h5>
-            <textarea readonly :value="currentResponse" class="input font-mono text-[10px] leading-relaxed resize-none h-48 bg-zinc-950/60 text-purple-300 border border-purple-500/10 shadow-[0_0_15px_rgba(168,85,247,0.05)] scroll-thin" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Worldbook Extraction Results -->
-      <div v-if="worldbook.entries.length" class="glass-card rounded-3xl p-5 border border-white/5 flex flex-col gap-4 shadow-xl animate-fade-in shadow-black/35">
-        <div class="flex justify-between items-center border-b border-white/5 pb-3">
-          <span class="font-extrabold text-sm tracking-wide text-purple-300">🎉 成功提取出 {{ worldbook.entries.length }} 条世界书设定</span>
-          <div class="flex gap-2">
-            <button @click="exportWorldbook" class="btn-secondary text-xs py-2 px-4 rounded-xl font-bold">📂 导出 JSON 世界书</button>
-            <button @click="saveToLibrary" class="btn-primary text-xs py-2 px-4 rounded-xl font-extrabold shadow-lg shadow-purple-500/15">💾 存入角色库</button>
-          </div>
-        </div>
-        
-        <div class="flex flex-col gap-2.5 max-h-[360px] overflow-y-auto pr-1">
-          <div v-for="entry in worldbook.entries" :key="entry.id"
-            class="bg-zinc-900/35 border border-white/5 rounded-2xl p-4 text-xs shadow-inner hover:border-purple-500/10 transition-all animate-fade-in">
-            <div class="text-[var(--primary)] font-extrabold mb-1.5 flex items-center justify-between">
-              <span class="text-zinc-100 text-sm">{{ entry.comment || '未命名分类' }}</span>
-              <span class="text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-md font-mono">🔑 {{ entry.keys.join(', ') || '(无触发词)' }}</span>
+          <div class="flex flex-col gap-1">
+            <label class="label">章节识别正则 (Regex)</label>
+            <div class="flex gap-2">
+              <input v-model="chapterRegex" class="input flex-1 font-mono text-xs py-2 px-2.5" />
+              <button @click="detectChapters" :disabled="!fileContent" class="btn-secondary whitespace-nowrap text-[11px] font-bold px-3 py-2 rounded-xl cursor-pointer">识别</button>
             </div>
-            <p class="text-[var(--text-muted)] leading-relaxed select-text mt-2 border-t border-white/3 pt-2 font-medium">{{ entry.content }}</p>
           </div>
         </div>
+
+        <!-- Incremental Mode Banner -->
+        <div class="glass-card rounded-2xl p-3 border border-white/5 flex items-center justify-between shadow-sm">
+          <div class="flex items-center gap-2.5">
+            <span class="text-lg">🔄</span>
+            <div class="flex flex-col">
+              <span class="text-[11px] font-bold text-zinc-100">智能增量提取模式</span>
+              <span class="text-[9px] text-[var(--text-muted)] mt-0.5">开启后将自动跳过重复条目，仅做内容更新</span>
+            </div>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer select-none">
+            <input type="checkbox" v-model="incrementalMode" class="accent-[var(--primary)] w-4 h-4 rounded cursor-pointer" />
+          </label>
+        </div>
+
+        <!-- Categories Configuration -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-white/5 shadow-sm">
+          <button @click="showCategories = !showCategories"
+            class="w-full px-4 py-3 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 bg-zinc-900/10">
+            <span class="flex items-center gap-1">📂 提取范畴（{{ categories.filter(c=>c.enabled).length }}/{{ categories.length }}）</span>
+            <span>{{ showCategories ? '▲ 收起' : '▼ 展开' }}</span>
+          </button>
+          
+          <div v-if="showCategories" class="px-4 pb-4 flex flex-col gap-2.5 pt-2.5">
+            <div v-for="(cat, i) in categories" :key="cat.name"
+              class="flex items-center gap-2.5 py-1.5 border-b border-white/5 last:border-0">
+              <label class="flex items-center gap-1.5 shrink-0 cursor-pointer">
+                <input type="checkbox" v-model="cat.enabled" class="accent-[var(--primary)] w-3.5 h-3.5 rounded" />
+                <span class="text-xs font-bold text-zinc-200 w-12">{{ cat.name }}</span>
+              </label>
+              <input v-model="cat.guide" class="input flex-1 py-1 px-2 text-[11px]" placeholder="提取指导..." />
+              <button v-if="!['角色','地点','组织'].includes(cat.name)"
+                @click="removeCategory(i)" class="text-red-400 hover:text-red-300 text-xs shrink-0 cursor-pointer p-0.5">✕</button>
+            </div>
+            
+            <!-- Add category -->
+            <div class="flex gap-1.5 mt-2 pt-2 border-t border-white/5">
+              <input v-model="newCatName" @keydown.enter.prevent="addCategory"
+                class="input flex-1 text-[11px] py-1.5 px-2" placeholder="新增分类 (如: 武器)..." />
+              <button @click="addCategory" class="btn-secondary text-[10px] px-2.5 py-1.5 rounded-lg font-bold shrink-0">+ 新增</button>
+              <button @click="categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES))"
+                class="btn-secondary text-[10px] px-2.5 py-1.5 rounded-lg font-bold text-zinc-400 border-dashed shrink-0" title="重置为默认分类">重置</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chapters Preview -->
+        <div v-if="chapters.length" class="glass-card rounded-2xl p-4 border border-white/5 shadow-sm animate-fade-in">
+          <h4 class="text-[10px] font-bold text-zinc-400 mb-2.5 uppercase tracking-wider">自动识别到 {{ chapters.length }} 个章节</h4>
+          <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1 scroll-thin">
+            <span v-for="(c, idx) in chapters.slice(0, 20)" :key="c.title + '-' + idx" class="text-[9px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2 py-0.5 rounded-md">{{ c.title }}</span>
+            <span v-if="chapters.length > 20" class="text-[10px] text-[var(--text-muted)] flex items-center pl-1 font-bold">...等其余 {{ chapters.length - 20 }} 章节</span>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <div class="flex gap-2.5 shrink-0 mt-1">
+          <button @click="generateWorldbook" :disabled="!fileContent || processing" class="btn-primary flex-1 py-3 text-xs font-extrabold shadow-lg shadow-purple-500/20">
+            🔮 开始 AI 智能解析世界设定
+          </button>
+          <button v-if="processing" @click="stopProcessing" class="btn-danger py-3 text-xs font-extrabold px-4.5 rounded-xl shadow-lg shadow-red-500/10 shrink-0 animate-pulse">
+            ■ 停止
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Live Output & Results -->
+      <div class="flex-1 w-full min-w-0 flex flex-col gap-5">
+        
+        <!-- Placeholder when idle -->
+        <div v-if="!processing && !worldbook.entries.length && !progress.total"
+          class="glass-card rounded-3xl p-12 text-center text-zinc-500 border border-white/5 flex flex-col items-center justify-center min-h-[380px] animate-fade-in shadow-lg">
+          <span class="text-6xl mb-4 block animate-bounce duration-[2000ms]">🔮</span>
+          <p class="font-extrabold text-sm text-zinc-300 tracking-wide">等待智能提取任务开始</p>
+          <p class="text-xs text-[var(--text-muted)] mt-2.5 leading-relaxed max-w-sm">
+            在左侧上传小说文档（.txt），配置好章节规则与要提取的分类设定，然后点击底部的<strong>“开始 AI 智能解析”</strong>。
+            提取的实时生成细节（Prompt 语句与 AI 流式回包）以及最终的世界书清单将会动态呈现在此处。
+          </p>
+        </div>
+
+        <!-- Progress Tracking & LLM Streams -->
+        <div v-if="processing || progress.total > 0" class="glass-card p-5 rounded-2xl border border-white/5 shadow-sm animate-fade-in flex flex-col gap-4">
+          <!-- Progress Bar Header -->
+          <div class="flex justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+            <span>{{ processing ? 'AI 正在全力提取剧情中...' : '设定提取已完成' }} (已处理：{{ progress.current }}/{{ progress.total }})</span>
+            <span class="text-purple-400 font-mono font-bold">{{ progressPct }}%</span>
+          </div>
+          <div class="h-2 bg-zinc-950 rounded-full overflow-hidden border border-white/5 shadow-inner">
+            <div class="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 transition-all duration-300 animate-pulse" :style="{ width: progressPct + '%' }" />
+          </div>
+
+          <!-- Prompt vs Response Grid -->
+          <div v-if="processing && (currentPrompt || currentResponse)" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 border-t border-white/5 pt-4 animate-fade-in">
+            <!-- Left Column: Prompt -->
+            <div class="flex flex-col gap-1.5 min-w-0">
+              <h5 class="text-[9px] font-extrabold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                <span>发送给大模型的 Prompt (片段 {{ progress.current }})</span>
+              </h5>
+              <textarea readonly :value="currentPrompt" class="input font-mono text-[10px] leading-relaxed resize-none h-44 bg-zinc-950/60 text-zinc-300 border border-white/5 scroll-thin" />
+            </div>
+
+            <!-- Right Column: Streaming Response -->
+            <div class="flex flex-col gap-1.5 min-w-0">
+              <h5 class="text-[9px] font-extrabold text-purple-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
+                <span>大模型实时回复 (Streaming JSON Response)</span>
+              </h5>
+              <textarea readonly :value="currentResponse" class="input font-mono text-[10px] leading-relaxed resize-none h-44 bg-zinc-950/60 text-purple-300 border border-purple-500/10 shadow-[0_0_15px_rgba(168,85,247,0.05)] scroll-thin" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Worldbook Extraction Results -->
+        <div v-if="worldbook.entries.length" class="glass-card rounded-3xl p-5 border border-white/5 flex flex-col gap-4 shadow-xl animate-fade-in shadow-black/35">
+          <div class="flex justify-between items-center border-b border-white/5 pb-3 shrink-0">
+            <span class="font-extrabold text-sm tracking-wide text-purple-300 flex items-center gap-1.5">
+              <span>🎉</span> 提取到 {{ worldbook.entries.length }} 条世界书设定
+            </span>
+            <div class="flex gap-2">
+              <button @click="exportWorldbook" class="btn-secondary text-xs py-2 px-4 rounded-xl font-bold cursor-pointer">📂 导出 JSON 世界书</button>
+              <button @click="saveToLibrary" class="btn-primary text-xs py-2 px-4 rounded-xl font-extrabold shadow-lg shadow-purple-500/15 cursor-pointer">💾 存入角色库</button>
+            </div>
+          </div>
+          
+          <div class="flex flex-col gap-2.5 max-h-[60vh] overflow-y-auto pr-1 scroll-thin">
+            <div v-for="entry in worldbook.entries" :key="entry.id"
+              class="bg-zinc-900/35 border border-white/5 rounded-2xl p-4 text-xs shadow-inner hover:border-purple-500/10 transition-all animate-fade-in">
+              <div class="text-[var(--primary)] font-extrabold mb-1.5 flex items-center justify-between">
+                <span class="text-zinc-100 text-sm">{{ entry.comment || '未命名分类' }}</span>
+                <span class="text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-md font-mono">🔑 {{ entry.keys.join(', ') || '(无触发词)' }}</span>
+              </div>
+              <p class="text-[var(--text-muted)] leading-relaxed select-text mt-2 border-t border-white/3 pt-2 font-medium">{{ entry.content }}</p>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
