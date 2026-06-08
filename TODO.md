@@ -92,13 +92,13 @@
 - [ ] **模型列表缓存**
 - [ ] **世界书批量操作**
 - [ ] **聊天导出**
-- [ ] **移动端适配优化**
+- [x] **移动端适配优化**
 
 ---
 
 ## 已知问题
 
-- [ ] AgentView `/peek` 响应未做 Markdown 渲染，代码块样式缺失
+- [x] **AgentView `/peek` 响应已支持 Markdown 渲染与美化代码块**
 - [ ] EditorView 正则 tab 中 `replaceString` 超长时 textarea 体验差
 - [ ] 尚未接入真实外部模型账号做 API 供应商联调
 - [ ] 尚未建立自动化 e2e / lint / test 回归门禁
