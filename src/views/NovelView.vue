@@ -681,45 +681,93 @@ ${seg}
   return prompt
 }
 
+async function saveStateToServer(state: any): Promise<boolean> {
+  try {
+    const res = await fetch('/api/novel-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state)
+    })
+    return res.ok
+  } catch (e) {
+    console.warn('Failed to save state to server filesystem:', e)
+    return false
+  }
+}
+
+async function getStateFromServer(): Promise<any> {
+  try {
+    const res = await fetch('/api/novel-state')
+    if (res.ok) {
+      return await res.json()
+    }
+  } catch (e) {
+    console.warn('Failed to load state from server filesystem:', e)
+  }
+  return null
+}
+
+async function clearStateOnServer(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/novel-state', {
+      method: 'DELETE'
+    })
+    return res.ok
+  } catch (e) {
+    console.warn('Failed to delete state on server filesystem:', e)
+    return false
+  }
+}
+
 async function saveState(currentIndex: number) {
+  const state = cloneForStorage({
+    key: 'current_state',
+    fileName: fileName.value,
+    fileContent: fileContent.value,
+    encoding: encoding.value,
+    chapterRegex: chapterRegex.value,
+    chapters: chapters.value,
+    incrementalMode: incrementalMode.value,
+    enablePlotOutline: enablePlotOutline.value,
+    enableLiteraryStyle: enableLiteraryStyle.value,
+    splitSize: splitSize.value,
+    localGeneratedWorldbook: localGeneratedWorldbookRef.value,
+    progressCurrent: currentIndex,
+    progressTotal: progress.value.total,
+    lastUpdate: Date.now()
+  })
+
+  // Try saving to server first
+  await saveStateToServer(state)
+
+  // Save to IndexedDB as local fallback
   try {
     const db = await openDB(STATE_DB, 1, db => {
       if (!db.objectStoreNames.contains(STATE_STORE)) {
         db.createObjectStore(STATE_STORE, { keyPath: 'key' })
       }
     })
-    
-    const state = cloneForStorage({
-      key: 'current_state',
-      fileName: fileName.value,
-      fileContent: fileContent.value,
-      encoding: encoding.value,
-      chapterRegex: chapterRegex.value,
-      chapters: chapters.value,
-      incrementalMode: incrementalMode.value,
-      enablePlotOutline: enablePlotOutline.value,
-      enableLiteraryStyle: enableLiteraryStyle.value,
-      splitSize: splitSize.value,
-      localGeneratedWorldbook: localGeneratedWorldbookRef.value,
-      progressCurrent: currentIndex,
-      progressTotal: progress.value.total,
-      lastUpdate: Date.now()
-    })
-    
     await tx(db, STATE_STORE, 'readwrite', s => s.put(state))
   } catch (e) {
-    console.error('Failed to auto-save progress:', e)
+    console.error('Failed to auto-save progress to IndexedDB:', e)
   }
 }
 
 async function checkSavedState() {
   try {
-    const db = await openDB(STATE_DB, 1, db => {
-      if (!db.objectStoreNames.contains(STATE_STORE)) {
-        db.createObjectStore(STATE_STORE, { keyPath: 'key' })
-      }
-    })
-    const state = await tx(db, STATE_STORE, 'readonly', s => s.get('current_state'))
+    // Try server first
+    let state = await getStateFromServer()
+    
+    // Fallback to IndexedDB
+    if (!state) {
+      const db = await openDB(STATE_DB, 1, db => {
+        if (!db.objectStoreNames.contains(STATE_STORE)) {
+          db.createObjectStore(STATE_STORE, { keyPath: 'key' })
+        }
+      })
+      state = await tx(db, STATE_STORE, 'readonly', s => s.get('current_state'))
+    }
+
     if (state) {
       hasSavedState.value = true
       const processed = state.chapters.filter((c: any) => c.processed).length
@@ -740,12 +788,19 @@ async function checkSavedState() {
 
 async function restoreSavedState() {
   try {
-    const db = await openDB(STATE_DB, 1, db => {
-      if (!db.objectStoreNames.contains(STATE_STORE)) {
-        db.createObjectStore(STATE_STORE, { keyPath: 'key' })
-      }
-    })
-    const state = await tx(db, STATE_STORE, 'readonly', s => s.get('current_state'))
+    // Try server first
+    let state = await getStateFromServer()
+    
+    // Fallback to IndexedDB
+    if (!state) {
+      const db = await openDB(STATE_DB, 1, db => {
+        if (!db.objectStoreNames.contains(STATE_STORE)) {
+          db.createObjectStore(STATE_STORE, { keyPath: 'key' })
+        }
+      })
+      state = await tx(db, STATE_STORE, 'readonly', s => s.get('current_state'))
+    }
+
     if (state) {
       fileName.value = state.fileName
       fileContent.value = state.fileContent
@@ -774,6 +829,10 @@ async function restoreSavedState() {
 }
 
 async function discardSavedState() {
+  // Clear server state
+  await clearStateOnServer()
+
+  // Clear IndexedDB state
   try {
     const db = await openDB(STATE_DB, 1, db => {
       if (!db.objectStoreNames.contains(STATE_STORE)) {
