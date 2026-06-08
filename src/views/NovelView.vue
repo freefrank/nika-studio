@@ -34,6 +34,7 @@ const hasSavedState = ref(false)
 const savedStateInfo = ref({ fileName: '', progress: '', percent: 0 })
 const STATE_DB = 'NikaNovelStateDB'
 const STATE_STORE = 'novel_state'
+const showChaptersList = ref(true)
 
 // 自定义分类系统
 interface Category {
@@ -1156,25 +1157,6 @@ const progressPct = computed(() =>
           </div>
         </div>
 
-        <!-- Chapters Preview with Status Marks -->
-        <div v-if="chapters.length" class="glass-card rounded-2xl p-4 border border-white/5 shadow-sm animate-fade-in flex flex-col gap-2">
-          <div class="flex justify-between items-center mb-1">
-            <h4 class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">章节处理进度 (已完成：{{ chapters.filter(c=>c.processed).length }}/{{ chapters.length }})</h4>
-          </div>
-          <div class="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1 scroll-thin">
-            <div v-for="(c, idx) in chapters" :key="c.title + '-' + idx" 
-              class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-zinc-950/40 border border-white/5 hover:bg-zinc-900/10 transition-colors">
-              <span class="truncate font-bold text-zinc-200 pr-2" :class="{'text-emerald-400': c.processed, 'text-rose-400': c.failed}">{{ c.title }}</span>
-              <span class="flex items-center gap-1.5 shrink-0 select-none">
-                <span v-if="c.processed" class="text-[9px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">✔️ 已完成</span>
-                <span v-else-if="c.failed" class="text-[9px] font-extrabold bg-rose-500/15 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-md cursor-help" :title="c.error">❌ 失败</span>
-                <span v-else-if="processing && progress.current === idx + 1" class="text-[9px] font-extrabold bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-md animate-pulse">⚡ 处理中</span>
-                <span v-else class="text-[9px] font-extrabold bg-zinc-800/30 text-zinc-500 border border-zinc-800/40 px-2 py-0.5 rounded-md">⏳ 等待中</span>
-              </span>
-            </div>
-          </div>
-        </div>
-
         <!-- Action Button -->
         <div class="flex gap-2.5 shrink-0 mt-1">
           <button @click="generateWorldbook" :disabled="!fileContent || processing" class="btn-primary flex-1 py-3 text-xs font-extrabold shadow-lg shadow-purple-500/20">
@@ -1189,6 +1171,31 @@ const progressPct = computed(() =>
 
       <!-- Right Column: Live Output & Results -->
       <div class="flex-1 w-full min-w-0 flex flex-col gap-5">
+        
+        <!-- Chapters Preview with Status Marks (Collapsible) -->
+        <div v-if="chapters.length" class="glass-card rounded-2xl border border-white/5 shadow-sm animate-fade-in flex flex-col overflow-hidden">
+          <button @click="showChaptersList = !showChaptersList"
+            :class="[
+              'w-full px-4 py-3 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:bg-white/5 transition-colors cursor-pointer bg-zinc-900/10 select-none',
+              showChaptersList ? 'border-b border-white/5' : ''
+            ]">
+            <span class="flex items-center gap-1.5 text-zinc-300">章节处理进度 (已完成：{{ chapters.filter(c=>c.processed).length }}/{{ chapters.length }})</span>
+            <span>{{ showChaptersList ? '▲ 收起' : '▼ 展开' }}</span>
+          </button>
+          
+          <div v-if="showChaptersList" class="p-4 flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1 scroll-thin">
+            <div v-for="(c, idx) in chapters" :key="c.title + '-' + idx" 
+              class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-zinc-950/40 border border-white/5 hover:bg-zinc-900/10 transition-colors">
+              <span class="truncate font-bold text-zinc-200 pr-2" :class="{'text-emerald-400': c.processed, 'text-rose-400': c.failed}">{{ c.title }}</span>
+              <span class="flex items-center gap-1.5 shrink-0 select-none">
+                <span v-if="c.processed" class="text-[9px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">✔️ 已完成</span>
+                <span v-else-if="c.failed" class="text-[9px] font-extrabold bg-rose-500/15 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-md cursor-help" :title="c.error">❌ 失败</span>
+                <span v-else-if="processing && progress.current === idx + 1" class="text-[9px] font-extrabold bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-md animate-pulse">⚡ 处理中</span>
+                <span v-else class="text-[9px] font-extrabold bg-zinc-800/30 text-zinc-500 border border-zinc-800/40 px-2 py-0.5 rounded-md">⏳ 等待中</span>
+              </span>
+            </div>
+          </div>
+        </div>
         
         <!-- Placeholder when idle -->
         <div v-if="!processing && !worldbook.entries.length && !progress.total"
