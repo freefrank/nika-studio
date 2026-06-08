@@ -85,6 +85,7 @@ export interface ApiConfig {
   apiKey: string
   baseUrl?: string
   model: string
+  useProxy?: boolean
 }
 
 export interface AppSettings {

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { cloneForStorage, openDB, tx } from '@/services/db'
+import { settingsService } from '@/services/settingsService'
 
 export interface ApiProfile {
   id: string
@@ -9,6 +10,7 @@ export interface ApiProfile {
   apiKey: string
   baseUrl?: string
   model: string
+  useProxy?: boolean
   updatedAt: number
 }
 
@@ -47,6 +49,20 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
 
   async function load() {
     profiles.value = await profileService.getAll()
+    if (activeId.value) {
+      const profile = profiles.value.find(p => p.id === activeId.value)
+      if (profile) {
+        settingsService.update({
+          apiConfig: {
+            provider: profile.provider,
+            apiKey: profile.apiKey,
+            baseUrl: profile.baseUrl,
+            model: profile.model,
+            useProxy: profile.useProxy ?? false
+          }
+        })
+      }
+    }
   }
 
   async function save(p: ApiProfile) {
@@ -54,6 +70,9 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     const idx = profiles.value.findIndex(x => x.id === saved.id)
     if (idx >= 0) profiles.value[idx] = saved
     else profiles.value.push(saved)
+    if (activeId.value === saved.id) {
+      setActive(saved.id)
+    }
   }
 
   async function remove(id: string) {
@@ -64,8 +83,23 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
 
   function setActive(id: string | null) {
     activeId.value = id
-    if (id) localStorage.setItem('nika_active_profile', id)
-    else localStorage.removeItem('nika_active_profile')
+    if (id) {
+      localStorage.setItem('nika_active_profile', id)
+      const profile = profiles.value.find(p => p.id === id)
+      if (profile) {
+        settingsService.update({
+          apiConfig: {
+            provider: profile.provider,
+            apiKey: profile.apiKey,
+            baseUrl: profile.baseUrl,
+            model: profile.model,
+            useProxy: profile.useProxy ?? false
+          }
+        })
+      }
+    } else {
+      localStorage.removeItem('nika_active_profile')
+    }
   }
 
   return { profiles, activeId, active, load, save, remove, setActive }

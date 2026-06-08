@@ -21,7 +21,7 @@ onMounted(() => store.load())
 function newProfile() {
   editing.value = {
     id: crypto.randomUUID(), name: '新配置',
-    provider: 'deepseek', apiKey: '', model: 'deepseek-chat', updatedAt: 0,
+    provider: 'deepseek', apiKey: '', model: 'deepseek-chat', useProxy: false, updatedAt: 0,
   }
   testResult.value = null
   testLoading.value = false
@@ -29,7 +29,7 @@ function newProfile() {
 }
 
 function editProfile(p: ApiProfile) {
-  editing.value = { ...p }
+  editing.value = { useProxy: false, ...p }
   testResult.value = null
   testLoading.value = false
   showForm.value = true
@@ -162,6 +162,12 @@ async function testConfig() {
           <div v-if="editing.provider !== 'deepseek' && editing.provider !== 'gemini'" class="field">
             <label>接口基址 (Base URL)</label>
             <input v-model="editing.baseUrl" class="input font-mono text-xs" placeholder="https://api.domain.com/v1" />
+          </div>
+
+          <!-- Local proxy switch -->
+          <div class="flex items-center gap-2 mt-2 select-none">
+            <input type="checkbox" id="use-local-proxy" v-model="editing.useProxy" class="accent-purple-500 w-4.5 h-4.5 rounded cursor-pointer" />
+            <label for="use-local-proxy" class="text-xs text-zinc-300 font-semibold cursor-pointer">使用本地开发代理 (解决 CORS 跨源限制)</label>
           </div>
 
           <!-- Connection Test Result -->

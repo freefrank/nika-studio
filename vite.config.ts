@@ -10,11 +10,20 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/proxy-cherry': {
-        target: 'https://open.cherryin.ai',
+      '/proxy': {
+        target: 'http://localhost',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/proxy-cherry/, ''),
-      },
+        router: (req: any) => {
+          const match = req.url?.match(/^\/proxy\/(https?)\/([^/]+)/)
+          if (match) {
+            const protocol = match[1]
+            const host = match[2]
+            return `${protocol}://${host}`
+          }
+          return 'http://localhost'
+        },
+        rewrite: (path: string) => path.replace(/^\/proxy\/https?\/[^/]+/, ''),
+      } as any,
     },
   },
 })

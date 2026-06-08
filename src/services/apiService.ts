@@ -45,6 +45,15 @@ function openaiUrl(cfg: ApiConfig) {
   return `${base}/chat/completions`
 }
 
+function applyProxy(url: string, useProxy?: boolean): string {
+  if (!useProxy) return url
+  const match = url.match(/^(https?):\/\/(.+)$/)
+  if (match) {
+    return `/proxy/${match[1]}/${match[2]}`
+  }
+  return url
+}
+
 export async function streamChat(
   cfg: ApiConfig,
   messages: Message[],
@@ -59,7 +68,10 @@ export async function streamChat(
     const body: Record<string, unknown> = { contents }
     if (system) body.systemInstruction = { parts: [{ text: system.content }] }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:streamGenerateContent?alt=sse&key=${cfg.apiKey}`
+    const url = applyProxy(
+      `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:streamGenerateContent?alt=sse&key=${cfg.apiKey}`,
+      cfg.useProxy
+    )
     const res = await fetch(url, {
       method: 'POST', signal,
       headers: { 'Content-Type': 'application/json' },
@@ -69,7 +81,7 @@ export async function streamChat(
     return parseSSE(res, onChunk, true)
   }
 
-  const res = await fetch(openaiUrl(cfg), {
+  const res = await fetch(applyProxy(openaiUrl(cfg), cfg.useProxy), {
     method: 'POST', signal,
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
     body: JSON.stringify({ model: cfg.model, messages, stream: true }),
@@ -94,7 +106,10 @@ export async function testConnection(cfg: ApiConfig): Promise<string> {
     const body: Record<string, unknown> = {
       contents: messages.map(m => ({ role: 'user', parts: [{ text: m.content }] }))
     }
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent?key=${cfg.apiKey}`
+    const url = applyProxy(
+      `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent?key=${cfg.apiKey}`,
+      cfg.useProxy
+    )
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -106,7 +121,7 @@ export async function testConnection(cfg: ApiConfig): Promise<string> {
     return reply || '(无回复内容)'
   }
 
-  const url = openaiUrl(cfg)
+  const url = applyProxy(openaiUrl(cfg), cfg.useProxy)
   const res = await fetch(url, {
     method: 'POST',
     headers: { 

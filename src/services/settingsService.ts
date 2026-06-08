@@ -3,7 +3,7 @@ import type { AppSettings } from '@/types'
 const KEY = 'nika_settings'
 
 const defaults: AppSettings = {
-  apiConfig: { provider: 'deepseek', apiKey: '', model: 'deepseek-chat' },
+  apiConfig: { provider: 'deepseek', apiKey: '', model: 'deepseek-chat', useProxy: false },
   language: 'zh',
   debug: false,
   limitlessPrompt: '',
