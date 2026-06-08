@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Ultra-modern Indigo, Violet and Purple Theme */
+  --primary: #a855f7;
+  --primary-dark: #7e22ce;
+  --primary-light: #c084fc;
+  --primary-glow: rgba(168, 85, 247, 0.15);
+  
+  --bg: #09090b;
+  --bg-2: #121214;
+  --bg-3: #1a1a1e;
+  --bg-glass: rgba(18, 18, 20, 0.7);
+  
+  --text: #fafafa;
+  --text-muted: #a1a1aa;
+  --border: rgba(63, 63, 70, 0.5);
+  --border-hover: rgba(168, 85, 247, 0.4);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  background-image: 
+    radial-gradient(circle at 80% 10%, rgba(168, 85, 247, 0.08), transparent 45%),
+    radial-gradient(circle at 15% 85%, rgba(236, 72, 153, 0.05), transparent 40%);
+  color: var(--text);
+  font-family: 'Outfit', 'Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism Panel Utility */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.4); }
+
+/* Custom Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(168, 85, 247, 0.15); }
+  50% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.35); }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
