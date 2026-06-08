@@ -196,20 +196,31 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: ['nika.zkx.ca'],
     proxy: {
-      '/proxy': {
+      '/proxy/https': {
+        target: 'https://localhost',
+        changeOrigin: true,
+        secure: false,
+        router: (req: any) => {
+          const match = req.url?.match(/^\/proxy\/https\/([^/]+)/)
+          if (match) {
+            return `https://${match[1]}`
+          }
+          return 'https://localhost'
+        },
+        rewrite: (path: string) => path.replace(/^\/proxy\/https\/[^/]+/, ''),
+      } as any,
+      '/proxy/http': {
         target: 'http://localhost',
         changeOrigin: true,
         secure: false,
         router: (req: any) => {
-          const match = req.url?.match(/^\/proxy\/(https?)\/([^/]+)/)
+          const match = req.url?.match(/^\/proxy\/http\/([^/]+)/)
           if (match) {
-            const protocol = match[1]
-            const host = match[2]
-            return `${protocol}://${host}`
+            return `http://${match[1]}`
           }
           return 'http://localhost'
         },
-        rewrite: (path: string) => path.replace(/^\/proxy\/https?\/[^/]+/, ''),
+        rewrite: (path: string) => path.replace(/^\/proxy\/http\/[^/]+/, ''),
       } as any,
     },
   },
