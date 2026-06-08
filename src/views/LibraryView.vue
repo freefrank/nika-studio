@@ -56,109 +56,167 @@ async function importCharacter(e: Event) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[var(--bg)] text-[var(--text)] animate-slide-up">
+  <div class="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-10">
     <!-- Header -->
-    <div class="flex flex-wrap items-center gap-3 px-5 pt-5 mb-4">
-      <h1 class="text-2xl font-extrabold bg-gradient-to-r from-purple-400 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent mr-auto tracking-wide">妮卡角色工作室 Pro</h1>
-      <button @click="router.push('/settings')" class="btn-secondary">⚙️ 设置</button>
-    </div>
+    <header class="sticky top-0 z-30 w-full glass-panel border-b border-white/5 px-6 py-4 flex items-center justify-between shadow-lg shadow-black/10">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🎭</span>
+        <h1 class="text-2xl font-extrabold text-gradient-primary tracking-wide">妮卡角色工作室 Pro</h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <button @click="router.push('/settings')" class="btn-secondary flex items-center gap-2 py-2 px-4 text-xs font-bold rounded-xl">
+          <span>⚙️</span> 设置
+        </button>
+      </div>
+    </header>
 
-    <!-- Tabs -->
-    <div class="flex gap-1 px-5 mb-5 border-b border-white/5">
-      <button @click="activeTab = 'characters'" class="tab" :class="{ active: activeTab === 'characters' }">🎭 角色库</button>
-      <button @click="activeTab = 'novel'" class="tab" :class="{ active: activeTab === 'novel' }">📚 txt转世界书</button>
+    <!-- Segmented Control Tabs -->
+    <div class="flex justify-center my-8 shrink-0">
+      <div class="bg-zinc-950/60 p-1.5 rounded-2xl border border-white/5 flex gap-1">
+        <button @click="activeTab = 'characters'" 
+          class="px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 cursor-pointer"
+          :class="activeTab === 'characters' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20' : 'text-zinc-400 hover:text-white'">
+          <span>🎭</span> 角色库
+        </button>
+        <button @click="activeTab = 'novel'" 
+          class="px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2 cursor-pointer"
+          :class="activeTab === 'novel' ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20' : 'text-zinc-400 hover:text-white'">
+          <span>📚</span> txt转世界书
+        </button>
+      </div>
     </div>
 
     <!-- ══ Characters Tab ══ -->
     <template v-if="activeTab === 'characters'">
-      <div class="px-5">
-        <div class="flex flex-wrap gap-3 mb-6">
-          <button @click="newCharacter" class="btn-primary">+ 创建角色</button>
-          <label class="btn-secondary cursor-pointer">
-            📥 导入
-            <input type="file" accept=".json,.png" class="hidden" @change="importCharacter" />
-          </label>
-        </div>
-        <div class="flex gap-3 mb-6 flex-wrap">
-          <input v-model="search" placeholder="搜索角色..." class="input flex-1 min-w-40" />
-          <select v-model="filterTag" class="input w-42 cursor-pointer">
-            <option value="" class="bg-zinc-950">全部标签</option>
-            <option v-for="tag in allTags" :key="tag" :value="tag" class="bg-zinc-950">{{ tag }}</option>
-          </select>
-        </div>
-      </div>
-      <div v-if="store.loading" class="text-center text-[var(--text-muted)] py-20">
-        <div class="inline-block w-8 h-8 border-2 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-4"></div>
-        <p>加载中...</p>
-      </div>
-      <div v-else-if="!filtered.length" class="max-w-md mx-auto text-center py-16 px-6 glass-panel rounded-2xl border border-white/5 my-10">
-        <div class="w-16 h-16 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">🎭</div>
-        <h3 class="text-lg font-semibold mb-2">暂无角色卡</h3>
-        <p class="text-sm text-[var(--text-muted)] mb-6">您还没有创建角色卡，或者当前搜索条件未匹配到任何角色。</p>
-        <div class="flex justify-center gap-3">
-          <button @click="newCharacter" class="btn-primary text-sm">+ 创建角色</button>
-          <label class="btn-secondary text-sm cursor-pointer">
-            📥 导入角色卡
-            <input type="file" accept=".json,.png" class="hidden" @change="importCharacter" />
-          </label>
-        </div>
-      </div>
-      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(185px,1fr))] gap-5 px-5 pb-5">
-        <div v-for="char in filtered" :key="char.id"
-          class="relative rounded-xl overflow-hidden glass-panel border border-white/5 group hover:border-[var(--primary)] hover:-translate-y-1.5 hover:shadow-[0_12px_30px_rgba(168,85,247,0.15)] transition-all duration-300">
-          <div class="aspect-[3/4] relative overflow-hidden bg-zinc-950">
-            <img v-if="char.avatar" :src="char.avatar" :alt="char.name" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            <div v-else class="w-full h-full flex items-center justify-center bg-zinc-900/50 text-5xl">🎭</div>
-            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-3 gap-2 translate-y-3 group-hover:translate-y-0">
-              <button @click="chatWithCharacter(char.id)" class="btn-sm-primary w-full py-1.5 font-semibold text-xs rounded-lg flex items-center justify-center gap-1">💬 聊天</button>
-              <button @click="editCharacter(char.id)" class="btn-sm w-full py-1.5 font-medium text-xs rounded-lg flex items-center justify-center gap-1">✏️ 编辑</button>
-              <button @click="router.push(`/agent/${char.id}`)" class="btn-sm w-full py-1.5 font-medium text-xs rounded-lg flex items-center justify-center gap-1">🤖 AI助手</button>
-            </div>
-            <button @click.stop="toggleFavorite(char)"
-              class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 border border-white/10 flex items-center justify-center text-sm transition-all duration-200 backdrop-blur-sm cursor-pointer"
-              :class="char.isFavorite ? 'text-yellow-400 hover:text-yellow-300' : 'text-white/40 hover:text-white'">★</button>
+      <div class="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6 flex-1">
+        <!-- Controls -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <!-- Action buttons -->
+          <div class="flex items-center gap-3">
+            <button @click="newCharacter" class="btn-primary flex items-center gap-2">
+              <span class="text-lg">+</span> 创建角色
+            </button>
+            <label class="btn-secondary cursor-pointer flex items-center gap-2">
+              <span>📥</span> 导入角色卡
+              <input type="file" accept=".json,.png" class="hidden" @change="importCharacter" />
+            </label>
           </div>
-          <div class="p-3">
-            <p class="font-semibold text-sm truncate group-hover:text-purple-400 transition-colors">{{ char.name }}</p>
-            <div class="flex flex-wrap gap-1 mt-1.5 min-h-[20px]">
-              <span v-for="tag in char.tags.slice(0,3)" :key="tag" class="tag">{{ tag }}</span>
+          
+          <!-- Search and filter -->
+          <div class="flex items-center gap-3 flex-1 md:max-w-md">
+            <div class="relative flex-1">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">🔍</span>
+              <input v-model="search" placeholder="搜索角色..." class="input input-icon w-full" />
+            </div>
+            <div class="relative shrink-0">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">🏷️</span>
+              <select v-model="filterTag" class="input input-icon pr-8 cursor-pointer appearance-none bg-zinc-900/50">
+                <option value="" class="bg-zinc-950">全部标签</option>
+                <option v-for="tag in allTags" :key="tag" :value="tag" class="bg-zinc-950">{{ tag }}</option>
+              </select>
+              <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none text-[10px]">▼</span>
             </div>
           </div>
-          <button @click="deleteCharacter(char)"
-            class="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/50 border border-white/10 hover:bg-red-600 hover:border-red-500 flex items-center justify-center text-white/50 hover:text-white text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-sm cursor-pointer">✕</button>
+        </div>
+
+        <!-- Loading -->
+        <div v-if="store.loading" class="text-center text-[var(--text-muted)] py-32 flex-1 flex flex-col items-center justify-center">
+          <div class="inline-block w-10 h-10 border-2 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-4"></div>
+          <p class="text-sm font-medium">角色库加载中...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="!filtered.length" class="max-w-md mx-auto text-center py-20 px-8 glass-card rounded-3xl border border-white/5 my-10 animate-fade-in shadow-2xl">
+          <div class="w-20 h-20 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 shadow-inner animate-pulse">🎭</div>
+          <h3 class="text-xl font-bold mb-2">暂无角色卡</h3>
+          <p class="text-sm text-[var(--text-muted)] mb-8 leading-relaxed">您还没有创建角色卡，或者当前的搜索条件未能匹配到任何角色。</p>
+          <div class="flex justify-center gap-3">
+            <button @click="newCharacter" class="btn-primary text-sm shadow-lg shadow-purple-500/20">+ 创建角色</button>
+            <label class="btn-secondary text-sm cursor-pointer">
+              <span>📥</span> 导入角色卡
+              <input type="file" accept=".json,.png" class="hidden" @change="importCharacter" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Grid Cards -->
+        <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6 pb-12 animate-fade-in">
+          <div v-for="char in filtered" :key="char.id"
+            class="relative rounded-2xl overflow-hidden glass-card group hover:border-[var(--primary)] hover:-translate-y-2 hover:shadow-[0_15px_30px_rgba(168,85,247,0.25)] transition-all duration-300 flex flex-col h-[320px]">
+            
+            <!-- Card Image/Avatar area -->
+            <div class="relative flex-1 overflow-hidden bg-zinc-950/40">
+              <img v-if="char.avatar" :src="char.avatar" :alt="char.name" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              <div v-else class="w-full h-full flex items-center justify-center bg-zinc-900/50 text-5xl">🎭</div>
+              
+              <!-- Hover actions overlay -->
+              <div class="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 gap-2 backdrop-blur-[2px] translate-y-4 group-hover:translate-y-0">
+                <button @click="chatWithCharacter(char.id)" class="btn-sm-primary w-full py-2 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/20">
+                  <span>💬</span> 聊天
+                </button>
+                <button @click="editCharacter(char.id)" class="btn-sm w-full py-2 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5">
+                  <span>✏️</span> 编辑
+                </button>
+                <button @click="router.push(`/agent/${char.id}`)" class="btn-sm w-full py-2 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5">
+                  <span>🤖</span> AI助手
+                </button>
+              </div>
+
+              <!-- Top right actions (Favorite) -->
+              <button @click.stop="toggleFavorite(char)"
+                class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/55 border border-white/10 flex items-center justify-center text-sm transition-all duration-200 backdrop-blur-md cursor-pointer hover:scale-110 active:scale-95"
+                :class="char.isFavorite ? 'text-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.3)]' : 'text-white/40 hover:text-white'">
+                ★
+              </button>
+
+              <!-- Top left actions (Delete) -->
+              <button @click="deleteCharacter(char)"
+                class="absolute top-3 left-3 w-8 h-8 rounded-full bg-black/55 border border-white/10 hover:bg-red-600 hover:border-red-500 flex items-center justify-center text-white/50 hover:text-white text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-md cursor-pointer hover:scale-110">
+                ✕
+              </button>
+            </div>
+
+            <!-- Card Info -->
+            <div class="p-4 bg-zinc-900/30 border-t border-white/5 flex flex-col gap-1.5 shrink-0">
+              <p class="font-bold text-sm truncate text-zinc-100 group-hover:text-purple-400 transition-colors">{{ char.name }}</p>
+              <div class="flex flex-wrap gap-1 min-h-[22px]">
+                <span v-for="tag in char.tags.slice(0, 2)" :key="tag" class="tag">{{ tag }}</span>
+                <span v-if="char.tags.length > 2" class="tag bg-white/5 text-zinc-400 border-0">+{{ char.tags.length - 2 }}</span>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     </template>
 
     <!-- ══ Novel Tab ══ -->
-    <NovelView v-else :standalone="false" />
+    <NovelView v-else :standalone="false" class="flex-1 max-w-7xl mx-auto w-full px-6" />
   </div>
 </template>
 
 <style scoped>
 @reference "tailwindcss";
 .btn-primary {
-  @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-purple-500/10 hover:shadow-purple-500/20 active:scale-95 cursor-pointer;
+  @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-purple-500/10 hover:shadow-purple-500/20 active:scale-95 cursor-pointer text-xs md:text-sm;
 }
 .btn-secondary {
-  @apply bg-zinc-900/50 hover:bg-zinc-800/80 text-[var(--text)] px-4 py-2.5 rounded-xl border border-white/5 hover:border-white/10 transition-all active:scale-95 cursor-pointer;
+  @apply bg-zinc-900/60 hover:bg-zinc-800/80 text-[var(--text)] px-4 py-2.5 rounded-xl border border-white/5 hover:border-white/10 transition-all active:scale-95 cursor-pointer text-xs md:text-sm font-semibold;
 }
 .btn-sm {
-  @apply bg-white/10 hover:bg-white/20 text-white text-xs px-2 py-1.5 rounded-lg border border-white/5 transition-colors cursor-pointer;
+  @apply bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-2 rounded-xl border border-white/5 transition-colors cursor-pointer;
 }
 .btn-sm-primary {
-  @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-xs px-2 py-1.5 rounded-lg transition-colors cursor-pointer;
+  @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-xs px-3 py-2 rounded-xl transition-colors cursor-pointer;
 }
 .input {
-  @apply bg-zinc-900/50 border border-white/5 focus:border-[var(--primary)] text-[var(--text)] px-4 py-2.5 rounded-xl outline-none transition-all focus:bg-zinc-900/80 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)];
+  @apply bg-zinc-900/40 border border-white/5 focus:border-[var(--primary)] text-[var(--text)] px-4 py-2.5 rounded-xl outline-none transition-all focus:bg-zinc-900/80 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-xs md:text-sm;
+}
+.input-icon {
+  padding-left: 2.5rem !important;
 }
 .tag {
-  @apply text-[10px] font-medium bg-purple-500/10 text-purple-300 border border-purple-500/10 px-1.5 py-0.5 rounded-md;
-}
-.tab {
-  @apply px-5 py-2.5 text-sm font-semibold text-[var(--text-muted)] border-b-2 border-transparent hover:text-[var(--text)] transition-all cursor-pointer -mb-px;
-}
-.tab.active {
-  @apply text-[var(--primary)] border-[var(--primary)];
+  @apply text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2 py-0.5 rounded-md;
 }
 </style>
+

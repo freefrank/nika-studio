@@ -253,257 +253,400 @@ function injectBeautifyStyle(style: string) {
 
 <template>
   <div class="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up">
-    <!-- Toolbar -->
-    <div class="flex items-center gap-2 px-4 py-3 bg-[var(--bg-2)]/80 backdrop-blur-md border-b border-white/5 sticky top-0 z-20 flex-wrap">
-      <button @click="router.back()" class="btn-icon">←</button>
-      <span class="font-bold text-sm md:text-base flex-1 truncate min-w-0 tracking-wide">{{ d.name || '新角色' }}</span>
-      <button @click="aiGenerate" :disabled="!!aiLoading" class="btn-ai text-xs">{{ aiLoading === 'all' ? '生成中…' : '🔮 AI一键生成' }}</button>
-      <button @click="translate('zh')" :disabled="translateLoading" class="btn-sm text-xs">{{ translateLoading ? '…' : '🌐 译中' }}</button>
-      <button @click="translate('en')" :disabled="translateLoading" class="btn-sm text-xs">🌐 →EN</button>
-      <button v-if="translateSnapshot" @click="undoTranslate" class="btn-sm text-xs text-yellow-400">↩ 撤销</button>
-      <button @click="exportCardAsJson(char)" class="btn-sm text-xs">JSON</button>
-      <button @click="exportCardAsPng(char)" class="btn-sm text-xs">PNG</button>
-      <button @click="exportLorebook(char)" class="btn-sm text-xs">Lorebook</button>
-      <button @click="beautifyModal = true" class="btn-ai text-xs">🎨 美化</button>
-      <button @click="save" :disabled="saving" class="btn-primary py-2 px-5 text-sm font-bold">{{ saving ? '…' : '保存' }}</button>
-    </div>
-
-    <div class="flex flex-1 overflow-hidden">
-      <!-- Avatar column -->
-      <div class="w-44 shrink-0 p-4 flex flex-col items-center gap-3 border-r border-white/5 bg-zinc-950/20">
-        <label class="cursor-pointer group relative">
-          <img v-if="char.avatar" :src="char.avatar" class="w-32 h-32 rounded-2xl object-cover border border-white/10 shadow-lg shadow-black/30 group-hover:scale-[1.02] transition-transform duration-300" />
-          <div v-else class="w-32 h-32 rounded-2xl bg-zinc-900/60 border border-white/5 flex items-center justify-center text-4xl shadow-inner group-hover:bg-zinc-800 transition-colors duration-300">🎭</div>
-          <input type="file" accept="image/*" class="hidden" @change="onAvatarChange" />
-          <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center text-xs text-white font-semibold backdrop-blur-[1px]">更换头像</div>
-        </label>
-        <p class="text-[10px] text-[var(--text-muted)] text-center">点击图片可更换头像</p>
-        <button @click="generateNames" class="btn-sm text-xs w-full py-2 rounded-xl">🎲 生成名字</button>
-        <button @click="router.push(`/agent/${char.id || ''}`)" class="btn-sm text-xs w-full py-2 rounded-xl">🤖 AI助手</button>
+    <!-- Header Toolbar -->
+    <header class="sticky top-0 z-30 w-full glass-panel border-b border-white/5 px-4 py-3 flex items-center justify-between shadow-lg shadow-black/15 flex-wrap gap-3">
+      <div class="flex items-center gap-3">
+        <button @click="router.back()" class="btn-secondary py-2 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1">
+          <span>←</span> 返回
+        </button>
+        <span class="font-extrabold text-sm md:text-base tracking-wide text-gradient-primary truncate max-w-[150px] md:max-w-[240px]">{{ d.name || '新角色' }}</span>
       </div>
 
-      <!-- Main content -->
-      <div class="flex-1 overflow-y-auto">
-        <div class="flex gap-1 p-1.5 border-b border-white/5 sticky top-0 bg-[var(--bg)]/90 backdrop-blur-md z-10 overflow-x-auto">
-          <button v-for="(label, key) in { basic:'基础', dialogue:'对话', greetings:'问候语', meta:'元数据', worldbook:'世界书', regex:'正则' }"
-            :key="key" @click="activeTab = key as typeof activeTab"
-            class="tab" :class="{ active: activeTab === key }">{{ label }}</button>
+      <!-- Toolbar Actions Group -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- AI Tools -->
+        <div class="bg-zinc-950/50 p-1 rounded-xl border border-white/5 flex gap-1 items-center">
+          <button @click="aiGenerate" :disabled="!!aiLoading" class="btn-ai-sm">
+            <span>🔮</span> {{ aiLoading === 'all' ? '生成中…' : 'AI生成整卡' }}
+          </button>
+          <button @click="beautifyModal = true" class="btn-ai-sm">
+            <span>🎨</span> 美化
+          </button>
         </div>
 
-        <div class="p-5 flex flex-col gap-5 max-w-4xl">
-          <!-- Basic -->
+        <!-- Translation -->
+        <div class="bg-zinc-950/50 p-1 rounded-xl border border-white/5 flex gap-1 items-center">
+          <button @click="translate('zh')" :disabled="translateLoading" class="btn-xs-action">译中</button>
+          <button @click="translate('en')" :disabled="translateLoading" class="btn-xs-action">译英</button>
+          <button v-if="translateSnapshot" @click="undoTranslate" class="btn-xs-action text-yellow-400">撤销</button>
+        </div>
+
+        <!-- Export formats -->
+        <div class="bg-zinc-950/50 p-1 rounded-xl border border-white/5 flex gap-1 items-center">
+          <button @click="exportCardAsJson(char)" class="btn-xs-action font-mono">JSON</button>
+          <button @click="exportCardAsPng(char)" class="btn-xs-action font-mono">PNG</button>
+          <button @click="exportLorebook(char)" class="btn-xs-action font-mono">Book</button>
+        </div>
+
+        <!-- Save Button -->
+        <button @click="save" :disabled="saving" class="btn-primary py-2 px-5 text-xs font-extrabold shadow-lg shadow-purple-500/20">
+          {{ saving ? '保存中…' : '💾 保存角色' }}
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex flex-1 overflow-hidden flex-col md:flex-row">
+      <!-- Left Sidebar (Avatar, Actions & Vertical Tabs) -->
+      <aside class="w-full md:w-56 shrink-0 p-5 flex flex-col gap-5 border-r border-white/5 bg-zinc-950/20 overflow-y-auto">
+        <!-- Avatar card -->
+        <div class="glass-card p-4 rounded-2xl flex flex-col items-center gap-3">
+          <label class="cursor-pointer group relative block w-28 h-28 rounded-2xl overflow-hidden border border-white/10 shadow-lg shadow-black/30">
+            <img v-if="char.avatar" :src="char.avatar" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <div v-else class="w-full h-full flex items-center justify-center bg-zinc-900/50 text-4xl">🎭</div>
+            <input type="file" accept="image/*" class="hidden" @change="onAvatarChange" />
+            <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white font-bold backdrop-blur-[1px]">更换头像</div>
+          </label>
+          <span class="text-[10px] text-[var(--text-muted)] text-center font-medium">点击图片上传头像</span>
+          
+          <div class="w-full flex flex-col gap-2 mt-2">
+            <button @click="generateNames" class="btn-action-outline w-full py-2 text-xs font-semibold rounded-xl">🎲 随机起名</button>
+            <button @click="router.push(`/agent/${char.id || ''}`)" class="btn-action-outline w-full py-2 text-xs font-semibold rounded-xl">🤖 召唤助手</button>
+          </div>
+        </div>
+
+        <!-- Sidebar Navigation (Desktop vertical tabs, mobile hides this and uses top tabs) -->
+        <nav class="hidden md:flex flex-col gap-1.5">
+          <span class="text-[10px] font-bold text-zinc-500 px-3 uppercase tracking-wider mb-1">编辑器菜单</span>
+          <button v-for="(label, key) in { basic:'📝 基础信息', dialogue:'💬 对话设定', greetings:'👋 问候用语', meta:'🏷️ 元数信息', worldbook:'🔮 世界设定', regex:'⚙️ 正则脚本' }"
+            :key="key" @click="activeTab = key as typeof activeTab"
+            class="tab-vertical" :class="{ active: activeTab === key }">
+            {{ label }}
+          </button>
+        </nav>
+      </aside>
+
+      <!-- Main Form Area -->
+      <main class="flex-1 overflow-y-auto flex flex-col">
+        <!-- Mobile Horizontal Tab Bar -->
+        <div class="md:hidden flex gap-1 p-2 border-b border-white/5 sticky top-0 bg-[var(--bg)]/95 backdrop-blur-md z-10 overflow-x-auto select-none shrink-0">
+          <button v-for="(label, key) in { basic:'📝 基础', dialogue:'💬 对话', greetings:'👋 问候', meta:'🏷️ 元数据', worldbook:'🔮 世界书', regex:'⚙️ 正则' }"
+            :key="key" @click="activeTab = key as typeof activeTab"
+            class="tab-capsule" :class="{ active: activeTab === key }">
+            {{ label }}
+          </button>
+        </div>
+
+        <!-- Form Fields Grid -->
+        <div class="p-6 md:p-8 flex flex-col gap-6 max-w-4xl w-full mx-auto pb-20">
+          <!-- Basic Tab -->
           <template v-if="activeTab === 'basic'">
             <div class="field">
-              <div class="flex justify-between items-center"><label>角色名</label></div>
-              <input v-model="d.name" class="input" placeholder="角色名称" />
+              <label>角色名 <span class="text-rose-500">*</span></label>
+              <input v-model="d.name" class="input" placeholder="输入角色名称..." />
             </div>
+            
             <div class="field">
               <div class="flex justify-between items-center">
-                <label>描述</label>
-                <button @click="aiField('description','描述')" :disabled="!!aiLoading" class="ai-btn">{{ aiLoading==='description'?'…':'✨' }}</button>
+                <label>角色描述 (Description)</label>
+                <button @click="aiField('description','描述')" :disabled="!!aiLoading" class="ai-field-btn">
+                  <span>{{ aiLoading === 'description' ? '生成中…' : '✨ AI 补全' }}</span>
+                </button>
               </div>
-              <textarea v-model="d.description" class="input resize-y" rows="8" placeholder="角色描述、外貌、背景..." />
+              <textarea v-model="d.description" class="input resize-y" rows="8" placeholder="描述角色的外貌、穿着、性格特征、背景故事、个人偏好..." />
             </div>
+
             <div class="field">
               <div class="flex justify-between items-center">
-                <label>性格</label>
-                <button @click="aiField('personality','性格')" :disabled="!!aiLoading" class="ai-btn">{{ aiLoading==='personality'?'…':'✨' }}</button>
+                <label>性格特点 (Personality)</label>
+                <button @click="aiField('personality','性格')" :disabled="!!aiLoading" class="ai-field-btn">
+                  <span>{{ aiLoading === 'personality' ? '生成中…' : '✨ AI 补全' }}</span>
+                </button>
               </div>
-              <textarea v-model="d.personality" class="input resize-y" rows="4" placeholder="性格特点..." />
+              <textarea v-model="d.personality" class="input resize-y" rows="4" placeholder="例如：傲娇、口嫌体正直、忠诚、幽默风趣..." />
             </div>
+
             <div class="field">
               <div class="flex justify-between items-center">
-                <label>场景</label>
-                <button @click="aiField('scenario','场景')" :disabled="!!aiLoading" class="ai-btn">{{ aiLoading==='scenario'?'…':'✨' }}</button>
+                <label>剧情背景与场景 (Scenario)</label>
+                <button @click="aiField('scenario','场景')" :disabled="!!aiLoading" class="ai-field-btn">
+                  <span>{{ aiLoading === 'scenario' ? '生成中…' : '✨ AI 补全' }}</span>
+                </button>
               </div>
-              <textarea v-model="d.scenario" class="input resize-y" rows="4" placeholder="故事背景场景..." />
+              <textarea v-model="d.scenario" class="input resize-y" rows="4" placeholder="设定对话发生的时间、地点、当前局势、双方关系等背景信息..." />
             </div>
           </template>
 
-          <!-- Dialogue -->
+          <!-- Dialogue Tab -->
           <template v-if="activeTab === 'dialogue'">
             <div class="field">
               <div class="flex justify-between items-center">
-                <label>首条消息</label>
-                <button @click="aiField('first_mes','首条消息')" :disabled="!!aiLoading" class="ai-btn">{{ aiLoading==='first_mes'?'…':'✨' }}</button>
+                <label>首条消息 (First Message)</label>
+                <button @click="aiField('first_mes','首条消息')" :disabled="!!aiLoading" class="ai-field-btn">
+                  <span>{{ aiLoading === 'first_mes' ? '生成中…' : '✨ AI 补全' }}</span>
+                </button>
               </div>
-              <textarea v-model="d.first_mes" class="input resize-y" rows="8" placeholder="角色的第一条消息..." />
+              <textarea v-model="d.first_mes" class="input resize-y" rows="8" placeholder="角色进入聊天时说出的第一句话，用于奠定对话基调..." />
             </div>
+
             <div class="field">
               <div class="flex justify-between items-center">
-                <label>对话示例</label>
-                <button @click="aiField('mes_example','对话示例')" :disabled="!!aiLoading" class="ai-btn">{{ aiLoading==='mes_example'?'…':'✨' }}</button>
+                <label>对话示例 (Dialogue Examples)</label>
+                <button @click="aiField('mes_example','对话示例')" :disabled="!!aiLoading" class="ai-field-btn">
+                  <span>{{ aiLoading === 'mes_example' ? '生成中…' : '✨ AI 补全' }}</span>
+                </button>
               </div>
-              <textarea v-model="d.mes_example" class="input resize-y" rows="6" placeholder="<START>&#10;{{user}}: ...&#10;{{char}}: ..." />
+              <textarea v-model="d.mes_example" class="input resize-y font-mono text-xs" rows="8" placeholder="<START>&#10;{{user}}: 你好！&#10;{{char}}: 哼，你终于来了，我等你好久了！" />
             </div>
+
             <div class="field">
               <div class="flex justify-between items-center">
-                <label>系统提示词</label>
-                <button @click="aiField('system_prompt','系统提示词')" :disabled="!!aiLoading" class="ai-btn">{{ aiLoading==='system_prompt'?'…':'✨' }}</button>
+                <label>系统提示词 (System Prompt)</label>
+                <button @click="aiField('system_prompt','系统提示词')" :disabled="!!aiLoading" class="ai-field-btn">
+                  <span>{{ aiLoading === 'system_prompt' ? '生成中…' : '✨ AI 补全' }}</span>
+                </button>
               </div>
-              <textarea v-model="d.system_prompt" class="input resize-y" rows="5" placeholder="发给AI的系统指令..." />
+              <textarea v-model="d.system_prompt" class="input resize-y font-mono text-xs" rows="5" placeholder="发给模型的全局系统设定，强制要求扮演该角色..." />
             </div>
+
             <div class="field">
-              <label>后置指令</label>
-              <textarea v-model="d.post_history_instructions" class="input resize-y" rows="4" placeholder="在每次对话末尾追加的指令..." />
+              <label>后置指令 (Post-History Instructions)</label>
+              <textarea v-model="d.post_history_instructions" class="input resize-y font-mono text-xs" rows="4" placeholder="在上下文对话历史末尾追加的系统提醒..." />
             </div>
           </template>
 
-          <!-- Greetings -->
+          <!-- Greetings Tab -->
           <template v-if="activeTab === 'greetings'">
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-[var(--text-muted)]">共 {{ (d.alternate_greetings?.length ?? 0) + 1 }} 条问候语（含首条消息）</span>
-              <button @click="d.alternate_greetings = [...(d.alternate_greetings ?? []), '']" class="btn-sm text-xs">+ 新增</button>
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-xs font-semibold text-[var(--text-muted)]">配置多开场白（共 {{ (d.alternate_greetings?.length ?? 0) + 1 }} 条）</span>
+              <button @click="d.alternate_greetings = [...(d.alternate_greetings ?? []), '']" class="btn-sm font-bold text-xs py-1.5 px-3 rounded-lg">+ 新增开场白</button>
             </div>
-            <div class="field">
-              <label>首条消息（必填）</label>
-              <textarea v-model="d.first_mes" class="input resize-y" rows="5" placeholder="角色进入对话时的第一条消息..." />
-            </div>
-            <div v-for="(_, i) in (d.alternate_greetings ?? [])" :key="i" class="bg-[var(--bg-2)] border border-[var(--border)] rounded-lg p-3 flex flex-col gap-2">
-              <div class="flex justify-between items-center">
-                <span class="text-xs text-[var(--text-muted)]">备用问候语 {{ i + 1 }}</span>
-                <button @click="d.alternate_greetings!.splice(i, 1)" class="text-red-400 hover:text-red-300 text-xs">删除</button>
+            
+            <div class="flex flex-col gap-4">
+              <div class="field glass-card p-4 rounded-2xl">
+                <label class="text-[10px] text-purple-400 font-bold uppercase tracking-wider mb-2">默认首条消息 (必填)</label>
+                <textarea v-model="d.first_mes" class="input resize-y" rows="5" placeholder="角色的主要开场白..." />
               </div>
-              <textarea v-model="d.alternate_greetings![i]" class="input resize-y text-sm" rows="4" placeholder="备用开场白..." />
+              
+              <div v-for="(_, i) in (d.alternate_greetings ?? [])" :key="i" class="field glass-card p-4 rounded-2xl animate-fade-in">
+                <div class="flex justify-between items-center mb-2">
+                  <label class="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">备用开场白 #{{ i + 1 }}</label>
+                  <button @click="d.alternate_greetings!.splice(i, 1)" class="text-red-400 hover:text-red-300 text-xs font-semibold">✕ 删除</button>
+                </div>
+                <textarea v-model="d.alternate_greetings![i]" class="input resize-y" rows="4" placeholder="输入备用开场白内容..." />
+              </div>
             </div>
           </template>
 
-          <!-- Meta -->
+          <!-- Meta Tab -->
           <template v-if="activeTab === 'meta'">
             <div class="field">
-              <label>标签</label>
-              <div class="flex flex-wrap gap-2 mb-2">
-                <span v-for="t in char.tags" :key="t" class="tag-badge">{{ t }} <button @click="removeTag(t)" class="ml-1 hover:text-red-400">×</button></span>
+              <label>分类标签</label>
+              <div class="flex flex-wrap gap-1.5 mb-2">
+                <span v-for="t in char.tags" :key="t" class="tag-badge">
+                  <span>{{ t }}</span>
+                  <button @click="removeTag(t)" class="hover:text-red-400 text-xs font-bold shrink-0">×</button>
+                </span>
+                <span v-if="!char.tags.length" class="text-xs text-[var(--text-muted)] italic">暂无标签</span>
               </div>
               <div class="flex gap-2">
-                <input v-model="tagInput" @keydown.enter.prevent="addTag" class="input flex-1" placeholder="输入标签，按Enter添加" />
-                <button @click="addTag" class="btn-sm">添加</button>
+                <input v-model="tagInput" @keydown.enter.prevent="addTag" class="input flex-1" placeholder="输入标签，按回车添加..." />
+                <button @click="addTag" class="btn-secondary py-2.5 text-xs font-bold px-4 rounded-xl">添加</button>
               </div>
             </div>
-            <div class="field"><label>创作者</label><input v-model="d.creator" class="input" /></div>
-            <div class="field"><label>版本</label><input v-model="d.character_version" class="input" /></div>
-            <div class="field"><label>备注</label><textarea v-model="d.creator_notes" class="input resize-y" rows="4" /></div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="field"><label>作者 (Creator)</label><input v-model="d.creator" class="input" placeholder="输入作者署名" /></div>
+              <div class="field"><label>角色版本 (Version)</label><input v-model="d.character_version" class="input" placeholder="如 1.0.0" /></div>
+            </div>
+            
+            <div class="field">
+              <label>创作者备注 (Creator Notes)</label>
+              <textarea v-model="d.creator_notes" class="input resize-y" rows="4" placeholder="关于该角色的开发说明、推荐设置或其他备注信息..." />
+            </div>
           </template>
 
-          <!-- Worldbook -->
+          <!-- Worldbook Tab -->
           <template v-if="activeTab === 'worldbook'">
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-[var(--text-muted)]">共 {{ d.character_book?.entries?.length ?? 0 }} 条</span>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-xs font-semibold text-[var(--text-muted)]">专属世界设定书（共 {{ d.character_book?.entries?.length ?? 0 }} 条）</span>
               <div class="flex gap-2">
-                <button @click="aiGenWorldbook" :disabled="!!aiLoading" class="btn-ai text-xs">{{ aiLoading==='worldbook'?'生成中…':'🔮 AI生成' }}</button>
-                <button @click="addWbEntry" class="btn-sm text-xs">+ 新增</button>
+                <button @click="aiGenWorldbook" :disabled="!!aiLoading" class="btn-ai-sm text-xs py-1.5 px-3 rounded-lg">
+                  <span>🔮</span> AI 批量生成设定
+                </button>
+                <button @click="addWbEntry" class="btn-sm font-bold text-xs py-1.5 px-3 rounded-lg">+ 新增条目</button>
               </div>
             </div>
-            <div v-if="!d.character_book?.entries?.length" class="text-center text-[var(--text-muted)] py-8">暂无条目</div>
-            <div v-for="entry in d.character_book?.entries ?? []" :key="entry.id"
-              class="bg-[var(--bg-2)] border border-[var(--border)] rounded-lg p-3 flex flex-col gap-2">
-              <div class="flex gap-2 items-center">
-                <input :value="wbKeys(entry)" @input="updateWbKeys(entry, ($event.target as HTMLInputElement).value)"
-                  class="input flex-1 text-sm" placeholder="关键词（逗号分隔）" />
-                <input v-model="entry.comment" class="input w-32 text-sm" placeholder="名称" />
-                <label class="flex items-center gap-1 text-xs cursor-pointer whitespace-nowrap">
-                  <input type="checkbox" v-model="entry.enabled" class="accent-[var(--primary)]" />启用</label>
-                <button @click="removeWbEntry(entry.id)" class="text-red-400 hover:text-red-300 text-sm shrink-0">✕</button>
+
+            <div v-if="!d.character_book?.entries?.length" class="text-center text-[var(--text-muted)] py-12 glass-card rounded-2xl border border-dashed border-white/5">
+              <span class="text-2xl block mb-2">🔮</span>
+              <p class="text-xs font-medium">暂无世界设定条目，点击上方按钮新增或由 AI 自动生成</p>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <div v-for="entry in d.character_book?.entries ?? []" :key="entry.id"
+                class="glass-card p-4 rounded-2xl flex flex-col gap-3 border border-white/5 hover:border-purple-500/20 transition-all animate-fade-in">
+                <div class="flex flex-wrap gap-2.5 items-center justify-between">
+                  <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+                    <div class="relative flex-1">
+                      <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-purple-400 font-bold">KEY</span>
+                      <input :value="wbKeys(entry)" @input="updateWbKeys(entry, ($event.target as HTMLInputElement).value)"
+                        class="input input-key py-1.5 text-xs font-semibold" placeholder="触发关键词 (英文逗号分隔)..." />
+                    </div>
+                    <input v-model="entry.comment" class="input py-1.5 w-32 text-xs font-semibold" placeholder="条目注释/名称" />
+                  </div>
+                  
+                  <div class="flex items-center gap-3 shrink-0">
+                    <label class="flex items-center gap-1.5 text-xs cursor-pointer font-bold uppercase tracking-wider text-[var(--text-muted)] select-none">
+                      <input type="checkbox" v-model="entry.enabled" class="accent-[var(--primary)] w-4 h-4" />
+                      <span>启用</span>
+                    </label>
+                    <button @click="removeWbEntry(entry.id)" class="text-red-400 hover:text-red-300 text-sm p-1 hover:bg-white/5 rounded-lg transition-colors">
+                      ✕
+                    </button>
+                  </div>
+                </div>
+                <textarea v-model="entry.content" class="input resize-y text-xs" rows="3" placeholder="当对话匹配触发词时插入的世界设定内容..." />
               </div>
-              <textarea v-model="entry.content" class="input resize-y text-sm" rows="3" placeholder="条目内容..." />
             </div>
           </template>
 
-          <!-- Regex 正则脚本 -->
+          <!-- Regex Tab -->
           <template v-if="activeTab === 'regex'">
-            <div class="flex justify-between items-center">
-              <span class="text-sm text-[var(--text-muted)]">共 {{ d.regex_scripts?.length ?? 0 }} 个脚本</span>
+            <div class="flex justify-between items-center mb-3">
+              <span class="text-xs font-semibold text-[var(--text-muted)]">正则替换处理脚本（共 {{ d.regex_scripts?.length ?? 0 }} 个）</span>
               <button @click="d.regex_scripts = [...(d.regex_scripts ?? []), { id: newUUID(), scriptName: '', findRegex: '', replaceString: '', enabled: true }]"
-                class="btn-sm text-xs">+ 新增</button>
+                class="btn-sm font-bold text-xs py-1.5 px-3 rounded-lg">+ 新增脚本</button>
             </div>
-            <div v-if="!d.regex_scripts?.length" class="text-center text-[var(--text-muted)] py-8">暂无正则脚本</div>
-            <div v-for="(rs, i) in (d.regex_scripts ?? [])" :key="rs.id"
-              class="bg-[var(--bg-2)] border border-[var(--border)] rounded-lg p-3 flex flex-col gap-2">
-              <div class="flex gap-2 items-center">
-                <input v-model="rs.scriptName" class="input flex-1 text-sm" placeholder="脚本名称" />
-                <label class="flex items-center gap-1 text-xs cursor-pointer whitespace-nowrap">
-                  <input type="checkbox" v-model="rs.enabled" class="accent-[var(--primary)]" />启用</label>
-                <button @click="d.regex_scripts!.splice(i, 1)" class="text-red-400 hover:text-red-300 text-sm shrink-0">✕</button>
+
+            <div v-if="!d.regex_scripts?.length" class="text-center text-[var(--text-muted)] py-12 glass-card rounded-2xl border border-dashed border-white/5">
+              <span class="text-2xl block mb-2">⚙️</span>
+              <p class="text-xs font-medium">暂无正则替换脚本，点击右上方按钮添加</p>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <div v-for="(rs, i) in (d.regex_scripts ?? [])" :key="rs.id"
+                class="glass-card p-4 rounded-2xl flex flex-col gap-3 border border-white/5 hover:border-purple-500/20 transition-all animate-fade-in">
+                <div class="flex items-center justify-between gap-3">
+                  <input v-model="rs.scriptName" class="input py-1.5 text-xs font-bold text-zinc-100 flex-1" placeholder="替换脚本名称..." />
+                  
+                  <div class="flex items-center gap-3 shrink-0">
+                    <label class="flex items-center gap-1.5 text-xs cursor-pointer font-bold uppercase tracking-wider text-[var(--text-muted)] select-none">
+                      <input type="checkbox" v-model="rs.enabled" class="accent-[var(--primary)] w-4 h-4" />
+                      <span>启用</span>
+                    </label>
+                    <button @click="d.regex_scripts!.splice(i, 1)" class="text-red-400 hover:text-red-300 text-sm p-1 hover:bg-white/5 rounded-lg transition-colors">
+                      ✕
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-2">
+                  <div class="relative">
+                    <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-purple-400 font-bold font-mono">MATCH</span>
+                    <input v-model="rs.findRegex" class="input input-match py-1.5 text-xs font-mono" placeholder="匹配正则表达式 (如 /\\*(.*?)\\*/g)..." />
+                  </div>
+                  
+                  <div class="relative flex flex-col gap-1.5">
+                    <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">替换内容 (Replace String)</label>
+                    <textarea v-model="rs.replaceString" class="input font-mono text-xs resize-y" rows="3" placeholder="替换文本，支持 $1, $2 占位符..." />
+                  </div>
+                </div>
               </div>
-              <input v-model="rs.findRegex" class="input text-sm font-mono" placeholder="匹配正则（findRegex）" />
-              <textarea v-model="rs.replaceString" class="input resize-y text-sm font-mono" rows="4" placeholder="替换内容（replaceString）" />
             </div>
           </template>
         </div>
-      </div>
+      </main>
     </div>
 
-    <!-- Name modal -->
-    <div v-if="nameModal" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-      <div class="bg-[var(--bg-2)] border border-[var(--border)] rounded-xl p-5 w-80 flex flex-col gap-4">
-        <div class="flex justify-between items-center">
-          <h3 class="font-bold">选择名字</h3>
-          <button @click="nameModal = false" class="text-[var(--text-muted)] hover:text-[var(--text)]">✕</button>
+    <!-- Name selection modal -->
+    <div v-if="nameModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+      <div class="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm flex flex-col gap-4 shadow-2xl animate-slide-up">
+        <div class="flex justify-between items-center border-b border-white/5 pb-2">
+          <h3 class="font-extrabold text-sm text-white tracking-wide">🎲 骰子起名</h3>
+          <button @click="nameModal = false" class="text-[var(--text-muted)] hover:text-white text-sm">✕</button>
         </div>
-        <div v-if="nameLoading" class="text-center text-[var(--text-muted)] py-4">生成中…</div>
-        <div v-else class="flex flex-col gap-2">
+        
+        <div v-if="nameLoading" class="text-center text-[var(--text-muted)] py-8 flex flex-col items-center justify-center gap-2">
+          <div class="inline-block w-6 h-6 border-2 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+          <span class="text-xs font-medium">灵感涌现中...</span>
+        </div>
+        
+        <div v-else class="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
           <button v-for="name in nameList" :key="name" @click="selectName(name)"
-            class="text-left px-3 py-2 rounded-lg bg-[var(--bg-3)] hover:bg-[var(--primary)] hover:text-white transition-colors text-sm">
+            class="text-left px-4 py-2.5 rounded-xl bg-zinc-950/60 border border-white/5 hover:bg-gradient-to-r hover:from-purple-500/20 hover:to-pink-500/20 hover:border-purple-500/30 text-sm font-semibold transition-all">
             {{ name }}
           </button>
         </div>
-        <div class="flex gap-2">
-          <button @click="generateNames" :disabled="nameLoading" class="btn-primary flex-1 text-sm">重新生成</button>
-          <button @click="nameModal = false" class="btn-sm text-sm">取消</button>
+        
+        <div class="flex gap-2 border-t border-white/5 pt-3">
+          <button @click="generateNames" :disabled="nameLoading" class="btn-primary flex-1 text-xs py-2 shadow-md shadow-purple-500/10">
+            🎲 重新掷骰
+          </button>
+          <button @click="nameModal = false" class="btn-secondary flex-1 text-xs py-2">取消</button>
         </div>
       </div>
     </div>
 
     <!-- AI 前端美化 modal -->
-    <div v-if="beautifyModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-      <div class="bg-[var(--bg-2)] border border-[var(--border)] rounded-xl p-5 w-full max-w-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-center shrink-0">
-          <h3 class="font-bold">🎨 AI 前端美化</h3>
-          <button @click="beautifyModal = false" class="text-[var(--text-muted)] hover:text-[var(--text)]">✕</button>
+    <div v-if="beautifyModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+      <div class="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-2xl flex flex-col gap-4 max-h-[90vh] shadow-2xl animate-slide-up">
+        <div class="flex justify-between items-center border-b border-white/5 pb-2 shrink-0">
+          <h3 class="font-extrabold text-sm text-white tracking-wide">🎨 AI 前端气泡美化 (Inject Custom CSS)</h3>
+          <button @click="beautifyModal = false" class="text-[var(--text-muted)] hover:text-white text-sm">✕</button>
         </div>
+        
         <div class="flex gap-3 flex-wrap shrink-0">
-          <div class="flex flex-col gap-1 flex-1 min-w-32">
-            <label class="text-xs text-[var(--text-muted)]">生成数量</label>
-            <select v-model="beautifyCount" class="input text-sm">
-              <option :value="3">3套</option>
-              <option :value="5">5套</option>
-              <option :value="8">8套</option>
+          <div class="flex flex-col gap-1.5 flex-1 min-w-32">
+            <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">生成样式方案数</label>
+            <select v-model="beautifyCount" class="input text-xs">
+              <option :value="3">3套方案</option>
+              <option :value="5">5套方案</option>
+              <option :value="8">8套方案</option>
             </select>
           </div>
-          <div class="flex flex-col gap-1 flex-1 min-w-32">
-            <label class="text-xs text-[var(--text-muted)]">每套行数上限</label>
-            <select v-model="beautifyLines" class="input text-sm">
-              <option :value="50">50行</option>
-              <option :value="80">80行</option>
-              <option :value="100">100行</option>
-              <option :value="0">不限制</option>
+          
+          <div class="flex flex-col gap-1.5 flex-1 min-w-32">
+            <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">CSS 行数限制</label>
+            <select v-model="beautifyLines" class="input text-xs">
+              <option :value="50">最长 50 行</option>
+              <option :value="80">最长 80 行</option>
+              <option :value="100">最长 100 行</option>
+              <option :value="0">不作限制</option>
             </select>
           </div>
         </div>
-        <div class="flex flex-col gap-1 shrink-0">
-          <label class="text-xs text-[var(--text-muted)]">额外要求（可选）</label>
-          <input v-model="beautifyReq" class="input text-sm" placeholder="例如：深色赛博朋克风格、带动画效果..." />
+
+        <div class="flex flex-col gap-1.5 shrink-0">
+          <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">设计细节要求 (Prompt)</label>
+          <input v-model="beautifyReq" class="input text-xs" placeholder="例如：赛博朋克深红霓虹风格、极简玻璃拟态、马卡龙可爱气泡..." />
         </div>
-        <button @click="runBeautify" :disabled="beautifyLoading" class="btn-primary text-sm shrink-0">
-          {{ beautifyLoading ? '生成中…' : '🔮 开始生成' }}
+        
+        <button @click="runBeautify" :disabled="beautifyLoading" class="btn-primary text-xs py-2.5 shrink-0 shadow-lg shadow-purple-500/10">
+          <span v-if="beautifyLoading" class="inline-block animate-spin mr-1">⏳</span>
+          <span>🔮 开始 AI 艺术创作</span>
         </button>
-        <!-- 生成结果 -->
-        <div v-if="beautifyStyles.length" class="flex flex-col gap-3">
+        
+        <!-- Results -->
+        <div v-if="beautifyStyles.length" class="flex flex-col gap-3 overflow-y-auto flex-1 pr-1">
           <div v-for="(style, i) in beautifyStyles" :key="i"
-            class="bg-[var(--bg-3)] border border-[var(--border)] rounded-lg overflow-hidden">
-            <div class="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]">
-              <span class="text-sm font-medium">样式 {{ i + 1 }}</span>
+            class="bg-zinc-950/60 border border-white/5 rounded-xl overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-zinc-900/30">
+              <span class="text-xs font-bold text-purple-300">艺术方案 #{{ i + 1 }}</span>
               <div class="flex gap-2">
                 <button @click="beautifyPreviewIdx = beautifyPreviewIdx === i ? null : i"
-                  class="text-xs text-[var(--primary)] hover:underline">
-                  {{ beautifyPreviewIdx === i ? '隐藏预览' : '预览' }}
+                  class="text-xs text-[var(--primary)] font-semibold hover:underline cursor-pointer">
+                  {{ beautifyPreviewIdx === i ? '收起预览' : '点击预览' }}
                 </button>
                 <button @click="injectBeautifyStyle(style)"
-                  class="text-xs bg-[var(--primary)] text-white px-2 py-0.5 rounded hover:bg-[var(--primary-dark)]">注入</button>
+                  class="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded-lg font-bold transition-all shadow shadow-purple-600/15">
+                  注入卡片
+                </button>
               </div>
             </div>
-            <iframe v-if="beautifyPreviewIdx === i" :srcdoc="style" class="w-full h-64 bg-white" sandbox="" />
-            <pre v-else class="p-3 text-xs overflow-x-auto max-h-32 text-[var(--text-muted)]">{{ style.slice(0, 300) }}{{ style.length > 300 ? '...' : '' }}</pre>
+            
+            <iframe v-if="beautifyPreviewIdx === i" :srcdoc="style" class="w-full h-64 bg-zinc-950" sandbox="" />
+            <pre v-else class="p-3.5 text-[10px] font-mono text-[var(--text-muted)] overflow-x-auto max-h-32 bg-black/30">{{ style.slice(0, 300) }}{{ style.length > 300 ? '...' : '' }}</pre>
           </div>
         </div>
       </div>
@@ -513,29 +656,57 @@ function injectBeautifyStyle(style: string) {
 
 <style scoped>
 @reference "tailwindcss";
+
+/* Custom Editor Styling */
 .btn-primary { 
-  @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl font-bold transition-all shadow-md shadow-purple-500/10 hover:shadow-purple-500/20 active:scale-95 disabled:opacity-50 cursor-pointer; 
+  @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer; 
 }
-.btn-ai { 
-  @apply bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/40 text-[var(--primary)] hover:text-purple-300 px-3.5 py-2 rounded-xl font-semibold transition-all disabled:opacity-50 cursor-pointer; 
+.btn-ai-sm { 
+  @apply bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/40 text-[var(--primary)] hover:text-purple-300 px-3.5 py-1.5 rounded-xl font-bold transition-all disabled:opacity-50 cursor-pointer text-xs flex items-center gap-1; 
+}
+.btn-secondary {
+  @apply bg-zinc-900/60 hover:bg-zinc-800/80 text-[var(--text)] px-3 py-2 rounded-xl border border-white/5 hover:border-white/10 transition-all cursor-pointer font-bold;
+}
+.btn-xs-action {
+  @apply hover:bg-white/10 text-zinc-300 hover:text-white px-2 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer;
 }
 .btn-sm { 
-  @apply bg-zinc-900/50 hover:bg-zinc-800/80 text-[var(--text)] px-3.5 py-2 rounded-xl border border-white/5 hover:border-white/10 transition-all cursor-pointer; 
+  @apply bg-zinc-900/60 hover:bg-zinc-800/80 text-[var(--text)] px-3 py-2 rounded-xl border border-white/5 hover:border-white/10 transition-all cursor-pointer; 
 }
-.btn-icon { @apply text-base p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer; }
-.ai-btn { 
-  @apply text-xs bg-purple-500/10 border border-purple-500/25 hover:border-purple-500/45 text-[var(--primary)] hover:bg-purple-500/20 hover:text-purple-300 transition-all px-2.5 py-1 rounded-lg disabled:opacity-40 cursor-pointer shadow-sm; 
+.btn-action-outline {
+  @apply border border-white/5 hover:border-purple-500/30 text-[var(--text-muted)] hover:text-[var(--primary)] hover:bg-purple-500/5 transition-all cursor-pointer;
+}
+.ai-field-btn { 
+  @apply text-xs bg-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 text-[var(--primary)] hover:bg-purple-500/20 hover:text-purple-300 transition-all px-3 py-1 rounded-xl disabled:opacity-40 cursor-pointer font-bold shadow-sm; 
 }
 .input { 
-  @apply w-full bg-zinc-900/50 border border-white/5 text-[var(--text)] px-3.5 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] transition-all focus:bg-zinc-900/85 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-sm; 
+  @apply w-full bg-zinc-950/40 border border-white/5 text-[var(--text)] px-4 py-3 rounded-2xl outline-none focus:border-[var(--primary)] transition-all focus:bg-zinc-900/75 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-xs md:text-sm; 
 }
-.field { @apply flex flex-col gap-1.5; }
-.field label { @apply text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider; }
-.tab { 
-  @apply px-4 py-2 text-xs font-semibold text-[var(--text-muted)] border-b-2 border-transparent hover:text-[var(--text)] transition-all rounded-lg hover:bg-white/5 cursor-pointer; 
+.input-key {
+  padding-left: 2.5rem !important;
 }
-.tab.active { 
-  @apply text-[var(--primary)] bg-purple-500/10 border-b-0 shadow-sm shadow-purple-500/5; 
+.input-match {
+  padding-left: 3.5rem !important;
 }
-.tag-badge { @apply text-xs bg-zinc-900/50 text-[var(--text)] px-2.5 py-1 rounded-lg border border-white/5 flex items-center gap-1 shadow-sm; }
+.field { @apply flex flex-col gap-2; }
+.field label { @apply text-xs text-zinc-400 font-bold uppercase tracking-wider select-none; }
+
+/* Desktop Tab Styling */
+.tab-vertical {
+  @apply text-left px-4 py-2.5 text-xs font-bold text-zinc-400 border-l-2 border-transparent hover:text-white hover:bg-white/5 transition-all rounded-r-xl cursor-pointer flex items-center gap-2;
+}
+.tab-vertical.active {
+  @apply text-[var(--primary)] border-[var(--primary)] bg-purple-500/10;
+}
+
+/* Mobile Tab Capsule */
+.tab-capsule { 
+  @apply px-4 py-2 text-xs font-bold text-zinc-400 border border-white/5 hover:text-white transition-all rounded-xl hover:bg-white/5 cursor-pointer whitespace-nowrap shrink-0; 
+}
+.tab-capsule.active { 
+  @apply text-[var(--primary)] bg-purple-500/10 border-purple-500/20 shadow-sm shadow-purple-500/5; 
+}
+
+.tag-badge { @apply text-xs bg-zinc-950/60 text-zinc-100 px-3 py-1 rounded-xl border border-white/5 flex items-center gap-2 shadow-sm font-semibold; }
 </style>
+

@@ -258,134 +258,146 @@ const progressPct = computed(() =>
 </script>
 
 <template>
-  <div :class="standalone ? 'min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up' : 'flex flex-col h-full'">
-    <div v-if="standalone" class="flex items-center gap-3 px-4 py-3 bg-[var(--bg-2)]/80 backdrop-blur-md border-b border-white/5 sticky top-0 z-20">
-      <button @click="router.push('/')" class="text-xl hover:text-[var(--primary)] transition-colors cursor-pointer">←</button>
-      <span class="font-bold text-sm md:text-base tracking-wide flex-1">📚 小说转世界书</span>
-    </div>
+  <div :class="standalone ? 'min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-10' : 'flex flex-col h-full pb-10'">
+    <!-- Header -->
+    <header v-if="standalone" class="flex items-center gap-3 px-5 py-3.5 bg-[var(--bg-2)]/85 backdrop-blur-md border-b border-white/5 sticky top-0 z-20 shadow-md">
+      <button @click="router.push('/')" class="btn-back-arrow">←</button>
+      <span class="font-extrabold text-sm md:text-base tracking-wide text-gradient-primary flex-1">📚 小说转世界书 (Novel to Lorebook)</span>
+    </header>
 
     <div class="flex-1 max-w-4xl mx-auto w-full p-5 flex flex-col gap-6">
-      <!-- Upload -->
+      <!-- Upload Drop Zone -->
       <div @dragover.prevent @drop="onDrop"
-        class="border-2 border-dashed border-white/10 hover:border-purple-500/50 bg-zinc-950/20 hover:bg-purple-500/5 rounded-2xl p-10 text-center transition-all cursor-pointer shadow-inner flex flex-col items-center justify-center min-h-[160px]"
+        class="group border-2 border-dashed border-white/10 hover:border-purple-500/40 bg-zinc-950/20 hover:bg-purple-500/5 rounded-2xl p-10 text-center transition-all duration-300 cursor-pointer shadow-inner flex flex-col items-center justify-center min-h-[180px] hover:scale-[1.005]"
         @click="fileInputEl?.click()">
         <input ref="fileInputEl" type="file" accept=".txt" class="hidden" @change="loadFile" />
-        <p class="text-4xl mb-3">📄</p>
-        <p v-if="fileName" class="font-bold text-[var(--primary)] text-sm tracking-wide">{{ fileName }}</p>
-        <p v-else class="text-sm font-semibold text-[var(--text-muted)]">拖拽或点击上传 .txt 小说文件</p>
-        <p v-if="fileContent" class="text-xs text-[var(--text-muted)] mt-1.5 font-mono">{{ fileContent.length.toLocaleString() }} 字符</p>
+        <span class="text-5xl mb-3 block transform group-hover:scale-110 transition-transform duration-300">📄</span>
+        <p v-if="fileName" class="font-extrabold text-[var(--primary)] text-sm tracking-wide bg-purple-500/5 border border-purple-500/20 py-1.5 px-4 rounded-xl shadow-sm">{{ fileName }}</p>
+        <p v-else class="text-sm font-bold text-zinc-300 group-hover:text-purple-300 transition-colors">拖拽或点击上传小说 .txt 文件</p>
+        <p v-if="fileContent" class="text-[10px] text-[var(--text-muted)] mt-2 font-mono bg-zinc-950/40 border border-white/5 px-2.5 py-1 rounded-md">{{ fileContent.length.toLocaleString() }} 字符</p>
       </div>
 
-      <!-- Options -->
-      <div class="glass-panel rounded-2xl p-5 border border-white/5 flex flex-wrap gap-4 shadow-sm">
+      <!-- Options Configuration Grid -->
+      <div class="glass-card rounded-2xl p-5 border border-white/5 grid grid-cols-1 md:grid-cols-4 gap-4 shadow-md">
         <div class="flex flex-col gap-1.5">
           <label class="label">文件编码</label>
-          <select v-model="encoding" class="input w-36 cursor-pointer">
+          <select v-model="encoding" class="input cursor-pointer bg-zinc-950">
             <option v-for="e in encodings" :key="e" :value="e" class="bg-zinc-950">{{ e === 'auto' ? '自动检测' : e }}</option>
           </select>
         </div>
-        <div class="flex flex-col gap-1.5 flex-1 min-w-48">
-          <label class="label">章节识别正则</label>
+        
+        <div class="flex flex-col gap-1.5 md:col-span-2">
+          <label class="label">章节识别正则 (Regex)</label>
           <div class="flex gap-2">
-            <input v-model="chapterRegex" class="input flex-1" />
-            <button @click="detectChapters" :disabled="!fileContent" class="btn-sm whitespace-nowrap px-4 py-2 text-xs font-semibold rounded-xl">识别章节</button>
+            <input v-model="chapterRegex" class="input flex-1 font-mono text-xs" />
+            <button @click="detectChapters" :disabled="!fileContent" class="btn-secondary whitespace-nowrap text-xs font-bold px-3.5 rounded-xl">识别章节</button>
           </div>
         </div>
+        
         <div class="flex flex-col gap-1.5">
           <label class="label">分段字数大小</label>
-          <select v-model="splitSize" class="input w-36 cursor-pointer">
+          <select v-model="splitSize" class="input cursor-pointer bg-zinc-950">
             <option :value="1500" class="bg-zinc-950">1500字</option>
             <option :value="3000" class="bg-zinc-950">3000字</option>
             <option :value="5000" class="bg-zinc-950">5000字</option>
           </select>
         </div>
-        <!-- 增量模式 -->
-        <div class="flex flex-col gap-1.5 justify-end mb-1">
-          <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            <input type="checkbox" v-model="incrementalMode" class="accent-[var(--primary)] w-4 h-4" />
-            <span>增量模式（跳过重复）</span>
-          </label>
-        </div>
       </div>
 
-      <!-- 自定义分类 -->
-      <div class="glass-panel rounded-2xl overflow-hidden border border-white/5 shadow-sm">
+      <!-- Incremental Mode Banner -->
+      <div class="glass-card rounded-2xl p-4 border border-white/5 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">🔄</span>
+          <div class="flex flex-col">
+            <span class="text-xs font-bold text-zinc-100">智能增量提取模式</span>
+            <span class="text-[10px] text-[var(--text-muted)]">开启后将自动跳过已存在的同名/同关键词条目，仅做内容更新</span>
+          </div>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer select-none">
+          <input type="checkbox" v-model="incrementalMode" class="accent-[var(--primary)] w-4 h-4" />
+        </label>
+      </div>
+
+      <!-- Categories Configuration -->
+      <div class="glass-card rounded-2xl overflow-hidden border border-white/5 shadow-sm">
         <button @click="showCategories = !showCategories"
-          class="w-full px-5 py-4 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:bg-white/5 transition-colors cursor-pointer">
-          <span>📂 提取分类配置（{{ categories.filter(c=>c.enabled).length }}/{{ categories.length }} 启用）</span>
-          <span>{{ showCategories ? '▲' : '▼' }}</span>
+          class="w-full px-5 py-4 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 bg-zinc-900/10">
+          <span class="flex items-center gap-1.5">📂 提取范畴配置（{{ categories.filter(c=>c.enabled).length }}/{{ categories.length }} 启用）</span>
+          <span>{{ showCategories ? '▲ 收起' : '▼ 展开' }}</span>
         </button>
-        <div v-if="showCategories" class="px-5 pb-5 flex flex-col gap-3">
+        
+        <div v-if="showCategories" class="px-5 pb-5 flex flex-col gap-3 pt-3">
           <div v-for="(cat, i) in categories" :key="cat.name"
-            class="flex items-start gap-3 py-3 border-b border-white/5 last:border-0">
-            <label class="flex items-center gap-2 shrink-0 mt-1 cursor-pointer">
+            class="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
+            <label class="flex items-center gap-2 shrink-0 cursor-pointer">
               <input type="checkbox" v-model="cat.enabled" class="accent-[var(--primary)] w-4 h-4" />
-              <span class="text-xs font-bold text-white w-16">{{ cat.name }}</span>
+              <span class="text-xs font-bold text-zinc-200 w-16">{{ cat.name }}</span>
             </label>
-            <input v-model="cat.guide" class="input flex-1 text-xs" placeholder="提取指导..." />
+            <input v-model="cat.guide" class="input flex-1 py-1.5 text-xs" placeholder="提取指导..." />
             <button v-if="!['角色','地点','组织'].includes(cat.name)"
-              @click="removeCategory(i)" class="text-red-400 hover:text-red-300 text-xs mt-2 shrink-0 cursor-pointer">✕</button>
+              @click="removeCategory(i)" class="text-red-400 hover:text-red-300 text-xs shrink-0 cursor-pointer p-1">✕</button>
           </div>
-          <!-- 新增分类 -->
-          <div class="flex gap-2 mt-2">
+          
+          <!-- Add category -->
+          <div class="flex gap-2 mt-3 pt-3 border-t border-white/5">
             <input v-model="newCatName" @keydown.enter.prevent="addCategory"
-              class="input flex-1 text-xs" placeholder="新分类名称，Enter添加" />
-            <button @click="addCategory" class="btn-sm text-xs px-4 py-2.5 rounded-xl">+ 添加</button>
+              class="input flex-1 text-xs" placeholder="新增设定分类 (例如: 武器、法宝)..." />
+            <button @click="addCategory" class="btn-secondary text-xs px-4 rounded-xl font-bold">+ 添加分类</button>
             <button @click="categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES))"
-              class="btn-sm text-xs px-4 py-2.5 rounded-xl text-[var(--text-muted)]">重置</button>
+              class="btn-secondary text-xs px-4 rounded-xl font-bold text-zinc-400 border-dashed">重置默认</button>
           </div>
         </div>
       </div>
 
-      <!-- Chapters preview -->
-      <div v-if="chapters.length" class="glass-panel rounded-2xl p-5 border border-white/5 shadow-sm">
-        <p class="text-xs font-semibold text-[var(--text-muted)] mb-3 uppercase tracking-wider">识别到 {{ chapters.length }} 个章节</p>
-        <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
-          <span v-for="c in chapters.slice(0,20)" :key="c.title" class="text-[10px] font-medium bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2 py-1 rounded-md">{{ c.title }}</span>
-          <span v-if="chapters.length > 20" class="text-xs text-[var(--text-muted)] flex items-center pl-1 font-semibold">...还有 {{ chapters.length - 20 }} 章</span>
+      <!-- Chapters Preview -->
+      <div v-if="chapters.length" class="glass-card rounded-2xl p-5 border border-white/5 shadow-sm animate-fade-in">
+        <h4 class="text-[10px] font-bold text-zinc-400 mb-3 uppercase tracking-wider">自动识别到 {{ chapters.length }} 个章节</h4>
+        <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+          <span v-for="c in chapters.slice(0, 20)" :key="c.title" class="text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2.5 py-1 rounded-lg">{{ c.title }}</span>
+          <span v-if="chapters.length > 20" class="text-xs text-[var(--text-muted)] flex items-center pl-1 font-bold">...等其余 {{ chapters.length - 20 }} 个章节</span>
         </div>
       </div>
 
-      <!-- Action -->
-      <div class="flex gap-3">
-        <button @click="generateWorldbook" :disabled="!fileContent || processing" class="btn-primary flex-1 py-3 text-sm font-bold">
-          🔮 AI生成世界书
+      <!-- Action Button -->
+      <div class="flex gap-3 shrink-0">
+        <button @click="generateWorldbook" :disabled="!fileContent || processing" class="btn-primary flex-1 py-3 text-sm font-extrabold shadow-lg shadow-purple-500/20">
+          🔮 开始 AI 智能解析世界设定
         </button>
-        <button v-if="processing" @click="stopProcessing" class="btn-danger py-3 text-sm font-bold">■ 停止生成</button>
+        <button v-if="processing" @click="stopProcessing" class="btn-danger py-3 text-sm font-extrabold px-6 rounded-xl shadow-lg shadow-red-500/10">
+          ■ 停止生成
+        </button>
       </div>
 
-      <!-- Progress -->
-      <div v-if="processing || progress.total > 0" class="glass-panel p-5 rounded-2xl border border-white/5 shadow-sm">
-        <div class="flex justify-between text-xs font-semibold text-[var(--text-muted)] mb-2 uppercase tracking-wider">
-          <span>{{ processing ? '正在处理章节...' : '处理已完成' }} {{ progress.current }}/{{ progress.total }}</span>
-          <span class="text-purple-400 font-mono">{{ progressPct }}%</span>
+      <!-- Progress Tracking -->
+      <div v-if="processing || progress.total > 0" class="glass-card p-5 rounded-2xl border border-white/5 shadow-sm animate-fade-in flex flex-col gap-2">
+        <div class="flex justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+          <span>{{ processing ? 'AI 正在全力提取剧情中...' : '设定提取已完成' }} (已处理：{{ progress.current }}/{{ progress.total }})</span>
+          <span class="text-purple-400 font-mono font-bold">{{ progressPct }}%</span>
         </div>
-        <div class="h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/5 shadow-inner">
-          <div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300" :style="{ width: progressPct + '%' }" />
+        <div class="h-2.5 bg-zinc-950 rounded-full overflow-hidden border border-white/5 shadow-inner">
+          <div class="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 transition-all duration-300 animate-pulse" :style="{ width: progressPct + '%' }" />
         </div>
       </div>
 
-      <!-- Worldbook result -->
-      <div v-if="worldbook.entries.length" class="glass-panel rounded-2xl p-5 border border-white/5 flex flex-col gap-4 shadow-lg shadow-black/25">
-        <div class="flex justify-between items-center">
-          <span class="font-bold text-sm tracking-wide text-purple-400">{{ worldbook.entries.length }} 条提取的世界书条目</span>
+      <!-- Worldbook Extraction Results -->
+      <div v-if="worldbook.entries.length" class="glass-card rounded-3xl p-5 border border-white/5 flex flex-col gap-4 shadow-xl animate-fade-in shadow-black/35">
+        <div class="flex justify-between items-center border-b border-white/5 pb-3">
+          <span class="font-extrabold text-sm tracking-wide text-purple-300">🎉 成功提取出 {{ worldbook.entries.length }} 条世界书设定</span>
           <div class="flex gap-2">
-            <button @click="exportWorldbook" class="btn-sm text-xs py-2 px-4 rounded-xl">导出 JSON</button>
-            <button @click="saveToLibrary" class="btn-primary text-xs py-2 px-4 rounded-xl shadow-lg shadow-purple-500/10">保存到角色库</button>
+            <button @click="exportWorldbook" class="btn-secondary text-xs py-2 px-4 rounded-xl font-bold">📂 导出 JSON 世界书</button>
+            <button @click="saveToLibrary" class="btn-primary text-xs py-2 px-4 rounded-xl font-extrabold shadow-lg shadow-purple-500/15">💾 存入角色库</button>
           </div>
         </div>
-        <div class="flex flex-col gap-2.5 max-h-80 overflow-y-auto pr-1">
-          <div v-for="entry in worldbook.entries.slice(0, 30)" :key="entry.id"
-            class="bg-zinc-900/50 border border-white/5 rounded-xl p-3.5 text-xs shadow-inner">
-            <div class="text-[var(--primary)] font-bold mb-1 flex items-center gap-2">
-              <span>{{ entry.comment || '—' }}</span>
-              <span class="text-[var(--text-muted)] text-[10px] bg-white/5 px-2 py-0.5 rounded-md border border-white/5 font-mono">🔑 {{ entry.keys.join(', ') }}</span>
+        
+        <div class="flex flex-col gap-2.5 max-h-[360px] overflow-y-auto pr-1">
+          <div v-for="entry in worldbook.entries" :key="entry.id"
+            class="bg-zinc-900/35 border border-white/5 rounded-2xl p-4 text-xs shadow-inner hover:border-purple-500/10 transition-all animate-fade-in">
+            <div class="text-[var(--primary)] font-extrabold mb-1.5 flex items-center justify-between">
+              <span class="text-zinc-100 text-sm">{{ entry.comment || '未命名分类' }}</span>
+              <span class="text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-md font-mono">🔑 {{ entry.keys.join(', ') || '(无触发词)' }}</span>
             </div>
-            <div class="text-[var(--text-muted)] leading-relaxed line-clamp-2 mt-1.5">{{ entry.content }}</div>
+            <p class="text-[var(--text-muted)] leading-relaxed select-text mt-2 border-t border-white/3 pt-2 font-medium">{{ entry.content }}</p>
           </div>
-          <p v-if="worldbook.entries.length > 30" class="text-xs text-center text-[var(--text-muted)] font-semibold py-2">
-            ...还有 {{ worldbook.entries.length - 30 }} 条条目已保存
-          </p>
         </div>
       </div>
     </div>
@@ -394,9 +406,25 @@ const progressPct = computed(() =>
 
 <style scoped>
 @reference "tailwindcss";
-.input { @apply bg-zinc-900/50 border border-white/5 text-[var(--text)] px-3.5 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] transition-all focus:bg-zinc-900/80 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-sm; }
-.btn-primary { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl transition-all shadow-md shadow-purple-500/10 hover:shadow-purple-500/20 active:scale-95 disabled:opacity-50 cursor-pointer; }
-.btn-sm { @apply bg-zinc-900/50 hover:bg-zinc-800/80 text-[var(--text)] px-3.5 py-2 rounded-xl border border-white/5 hover:border-white/10 transition-all cursor-pointer text-xs font-semibold; }
-.btn-danger { @apply bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-5 rounded-xl font-bold transition-all active:scale-95 cursor-pointer; }
-.label { @apply text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider; }
+
+.btn-back-arrow {
+  @apply text-xl p-1.5 hover:bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors cursor-pointer;
+}
+
+/* Form configurations */
+.input { 
+  @apply bg-zinc-950/40 border border-white/5 text-[var(--text)] px-3.5 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] transition-all focus:bg-zinc-900/70 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-xs md:text-sm; 
+}
+.btn-primary { 
+  @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl transition-all active:scale-95 disabled:opacity-50 cursor-pointer; 
+}
+.btn-secondary { 
+  @apply bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-white/10 text-[var(--text)] px-4 py-2.5 rounded-xl transition-all cursor-pointer font-bold; 
+}
+.btn-danger { 
+  @apply bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-5 rounded-xl font-bold transition-all active:scale-95 cursor-pointer; 
+}
+.label { 
+  @apply text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider select-none; 
+}
 </style>

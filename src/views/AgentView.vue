@@ -515,110 +515,187 @@ function renderContent(content: string) {
 </script>
 
 <template>
-  <div class="h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] animate-slide-up">
+  <div class="h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] animate-slide-up overflow-hidden">
     <!-- Header -->
-    <div class="flex items-center gap-3 px-4 py-3 bg-[var(--bg-2)]/80 backdrop-blur-md border-b border-white/5 shrink-0 z-20">
-      <button @click="router.back()" class="text-xl hover:text-[var(--primary)] transition-colors cursor-pointer">←</button>
-      <span class="text-lg">🤖</span>
-      <span class="font-bold text-sm flex-1 tracking-wide">妮卡 AI 助手 — {{ char?.name ?? '...' }}</span>
-      <button @click="showPreview = !showPreview" class="btn-sm text-xs py-1.5 px-3 rounded-lg">{{ showPreview ? '隐藏预览' : '显示预览' }}</button>
-      <button @click="clearHistory" class="w-8 h-8 rounded-lg flex items-center justify-center text-sm text-[var(--text-muted)] hover:bg-white/5 hover:text-red-400 transition-all cursor-pointer" title="清空对话">🗑️</button>
-    </div>
+    <header class="flex items-center gap-3 px-5 py-3.5 bg-[var(--bg-2)]/85 backdrop-blur-md border-b border-white/5 shrink-0 z-20 shadow-md">
+      <button @click="router.back()" class="btn-back-arrow">←</button>
+      <span class="text-xl animate-bounce">🤖</span>
+      
+      <div class="flex-1 min-w-0">
+        <div class="font-extrabold text-sm md:text-base text-zinc-100 truncate tracking-wide">妮卡 AI 助手</div>
+        <div class="text-[10px] text-purple-400 font-semibold flex items-center gap-1">
+          <span>●</span> 角色：{{ char?.name ?? '...' }}
+        </div>
+      </div>
 
+      <!-- Actions -->
+      <div class="flex items-center gap-1.5">
+        <button @click="showPreview = !showPreview" class="btn-header-action text-xs px-3 py-1.5 rounded-xl border border-white/5 bg-white/2 hover:bg-white/5" :class="{ 'text-[var(--primary)] border-purple-500/20 bg-purple-500/10': showPreview }">
+          {{ showPreview ? '隐藏预览' : '显示预览' }}
+        </button>
+        <button @click="clearHistory" class="btn-header-action hover:text-red-400" title="清空对话">🗑️</button>
+      </div>
+    </header>
+
+    <!-- Workspace -->
     <div class="flex flex-1 overflow-hidden">
-      <!-- Chat -->
-      <div class="flex flex-col flex-1 overflow-hidden">
-        <div ref="messagesEl" class="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
-          <div v-if="!messages.length" class="max-w-md mx-auto text-center py-16 px-6 glass-panel rounded-2xl border border-white/5 my-10">
-            <div class="w-16 h-16 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-lg shadow-purple-500/5">🤖</div>
-            <h3 class="text-lg font-semibold mb-2">我是妮卡AI助手</h3>
-            <p class="text-sm text-[var(--text-muted)]">我可以帮你修改和优化角色卡。你可以指令我：帮我改进描述、添加世界书条目、生成前端样式...</p>
+      <!-- Chat viewport -->
+      <div class="flex flex-col flex-1 overflow-hidden relative">
+        <div ref="messagesEl" class="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 scroll-smooth">
+          <!-- Empty State -->
+          <div v-if="!messages.length" class="max-w-md mx-auto text-center py-20 px-8 glass-card rounded-3xl border border-white/5 my-12 animate-fade-in shadow-2xl">
+            <div class="w-20 h-20 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 shadow-inner animate-pulse">🤖</div>
+            <h3 class="text-xl font-bold mb-2">我是妮卡 AI 助手</h3>
+            <p class="text-sm text-[var(--text-muted)] leading-relaxed">
+              我可以帮助您修改和优化角色卡。你可以直接对我说：<br />
+              <span class="text-purple-300 font-semibold">“帮我润色角色性格设定”</span> 或<br />
+              <span class="text-purple-300 font-semibold">“帮我为这个角色添加3个世界书设定”</span>
+            </p>
           </div>
+
+          <!-- Message bubbles -->
           <template v-for="msg in messages" :key="msg.id">
-            <div :class="['flex gap-3', msg.role === 'user' ? 'justify-end' : 'justify-start']" class="animate-slide-up">
-              <div v-if="msg.role === 'assistant'" class="text-xl shrink-0 mt-1">🤖</div>
-              <div :class="['bubble relative max-w-[80%] md:max-w-[70%]',
-                msg.role === 'user'
-                  ? 'bubble-user'
-                  : 'bubble-ai']"
+            <div :class="['flex gap-3.5 items-start', msg.role === 'user' ? 'justify-end' : 'justify-start']" class="animate-fade-in">
+              <div v-if="msg.role === 'assistant'" class="w-8 h-8 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-base shrink-0 mt-0.5 shadow-md">🤖</div>
+              <div :class="['bubble relative max-w-[85%] md:max-w-[70%]',
+                msg.role === 'user' ? 'bubble-user' : 'bubble-ai']"
                 v-html="renderContent(msg.content)" />
             </div>
           </template>
-          <div v-if="streaming" class="text-xs text-center text-[var(--text-muted)] animate-pulse">
-            <button @click="abortCtrl?.abort()" class="hover:text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg transition-colors cursor-pointer">■ 停止生成</button>
+
+          <!-- Streaming status indicator -->
+          <div v-if="streaming" class="flex justify-start pl-12 shrink-0">
+            <button @click="abortCtrl?.abort()" class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer font-bold shadow shadow-red-500/5 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-1.5">
+              <span class="inline-block w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+              <span>停止生成</span>
+            </button>
           </div>
         </div>
-        <!-- Input -->
-        <div class="px-4 py-4 bg-[var(--bg-2)]/60 backdrop-blur-md border-t border-white/5 shrink-0 flex gap-3 items-end">
-          <div class="flex-1 relative glass-panel rounded-xl overflow-hidden border border-white/5 focus-within:border-[var(--primary)] transition-all shadow-inner">
-            <textarea 
-              v-model="input" 
-              @keydown="onKeydown" 
-              :disabled="streaming" 
-              rows="1"
-              @input="adjustHeight"
-              ref="inputEl"
-              class="w-full bg-transparent text-[var(--text)] px-3.5 py-3 outline-none resize-none max-h-40 min-h-[44px] text-sm leading-relaxed" 
-              placeholder="输入消息... (Enter 发送，Shift+Enter 换行)" 
-            />
+
+        <!-- Input Box -->
+        <div class="px-4 py-4 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/95 to-transparent shrink-0">
+          <div class="max-w-4xl mx-auto flex gap-3 items-end">
+            <div class="flex-1 relative glass-card rounded-2xl border border-white/5 focus-within:border-[var(--primary)] focus-within:shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all overflow-hidden flex items-end">
+              <textarea 
+                v-model="input" 
+                @keydown="onKeydown" 
+                :disabled="streaming" 
+                rows="1"
+                @input="adjustHeight"
+                ref="inputEl"
+                class="w-full bg-transparent text-[var(--text)] px-4 py-3.5 outline-none resize-none max-h-40 min-h-[48px] text-sm leading-relaxed" 
+                placeholder="命令 AI 助手优化您的卡片... (Enter 发送)" 
+              />
+            </div>
+            <button 
+              @click="send" 
+              :disabled="streaming || !input.trim()" 
+              class="btn-send flex items-center justify-center rounded-2xl w-12 h-12 shrink-0 transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:pointer-events-none hover:shadow-purple-500/25 hover:shadow-lg"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5.5 h-5.5 transform rotate-[-15deg]">
+                <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+              </svg>
+            </button>
           </div>
-          <button 
-            @click="send" 
-            :disabled="streaming || !input.trim()" 
-            class="btn-send flex items-center justify-center rounded-xl w-11 h-11 shrink-0 transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-              <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
-            </svg>
-          </button>
         </div>
       </div>
 
-      <!-- HTML Preview pane -->
-      <div v-if="showPreview" class="w-96 shrink-0 border-l border-white/5 flex flex-col bg-zinc-950/20">
-        <div class="px-4 py-3 bg-[var(--bg-2)]/80 backdrop-blur-md border-b border-white/5 text-sm font-semibold tracking-wide shrink-0">HTML 预览</div>
-        <iframe :srcdoc="previewHtml" class="flex-1 bg-white" sandbox="" />
-      </div>
+      <!-- Right HTML Preview Pane -->
+      <transition name="slide-pane">
+        <div v-if="showPreview" class="w-96 shrink-0 border-l border-white/5 flex flex-col bg-zinc-950/20 shadow-2xl relative z-10">
+          <div class="px-5 py-4 bg-[var(--bg-2)]/90 backdrop-blur-md border-b border-white/5 text-sm font-extrabold tracking-wide shrink-0 flex items-center justify-between shadow-sm">
+            <span class="text-zinc-100 flex items-center gap-1.5">
+              <span>🎨</span> 网页预览窗口
+            </span>
+            <button @click="showPreview = false" class="text-zinc-400 hover:text-white text-xs">✕ 关闭</button>
+          </div>
+          <iframe :srcdoc="previewHtml" class="flex-1 bg-zinc-950" sandbox="" />
+        </div>
+      </transition>
     </div>
   </div>
 </template>
 
 <style scoped>
 @reference "tailwindcss";
-.input { @apply w-full bg-zinc-900/50 border border-white/5 text-[var(--text)] px-3 py-2 rounded-lg outline-none focus:border-[var(--primary)] transition-colors text-sm focus:bg-zinc-900/85; }
-.btn-primary { @apply bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-40 cursor-pointer; }
-.btn-sm { @apply bg-zinc-900/50 hover:bg-zinc-800/80 text-[var(--text)] px-3 py-1.5 rounded-lg border border-white/5 text-xs transition-colors cursor-pointer; }
-.btn-send { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20; }
-.bubble { @apply px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm; }
-.bubble-user { @apply bg-gradient-to-br from-purple-600 to-indigo-600 border border-purple-500/20 text-white rounded-tr-sm; }
-.bubble-ai {
-  @apply bg-zinc-900/50 border border-white/5 text-zinc-100 rounded-tl-sm relative pl-5;
+
+/* Header buttons */
+.btn-back-arrow {
+  @apply text-xl p-1.5 hover:bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors cursor-pointer;
+}
+.btn-header-action {
+  @apply w-auto h-9 rounded-xl flex items-center justify-center text-zinc-400 hover:bg-white/5 hover:text-white transition-all cursor-pointer text-xs font-bold;
+}
+
+/* Chat bubbles */
+.bubble { @apply px-4 py-3 rounded-2xl shadow-sm text-sm leading-relaxed relative overflow-hidden; }
+.bubble-user { 
+  @apply bg-gradient-to-br from-purple-600/90 to-indigo-600/90 border border-purple-500/20 text-white rounded-tr-sm; 
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+}
+.bubble-ai { 
+  @apply bg-zinc-900/45 border border-white/5 text-zinc-100 rounded-tl-sm pl-5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .bubble-ai::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 4px;
-  bottom: 4px;
+  top: 3px;
+  bottom: 3px;
   width: 3px;
   background: linear-gradient(to bottom, var(--primary), #ec4899);
   border-radius: 0 4px 4px 0;
 }
-:deep(.patch-block) { @apply bg-emerald-950/40 border border-emerald-800/30 rounded-xl p-3 text-xs text-emerald-300 overflow-x-auto my-2.5 whitespace-pre shadow-inner font-mono; }
-:deep(.html-block) { @apply bg-cyan-950/40 border border-cyan-800/30 rounded-xl p-3 text-xs text-cyan-300 overflow-x-auto my-2.5 whitespace-pre shadow-inner font-mono; }
-:deep(.code-block) { @apply bg-zinc-950/80 border border-white/5 rounded-xl p-3 text-xs text-zinc-300 overflow-x-auto my-2.5 whitespace-pre shadow-inner font-mono; }
-/* markdown rendered by marked */
-:deep(.bubble-ai p) { @apply mb-2 last:mb-0; }
-:deep(.bubble-ai strong) { @apply font-bold text-white; }
+
+/* Input & send */
+.btn-send { 
+  @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/10; 
+}
+
+/* Custom fenced code block styling inside assistant messages */
+:deep(.patch-block) { 
+  @apply bg-emerald-950/25 border border-emerald-800/25 rounded-xl p-3.5 text-xs text-emerald-300 overflow-x-auto my-3.5 whitespace-pre shadow-inner font-mono relative pl-10; 
+}
+:deep(.patch-block)::before {
+  content: '🛠️ PATCH';
+  @apply absolute left-3 top-2.5 text-[8px] font-bold text-emerald-500 bg-emerald-950 border border-emerald-900 px-1.5 py-0.5 rounded uppercase tracking-widest font-sans;
+}
+:deep(.html-block) { 
+  @apply bg-cyan-950/25 border border-cyan-800/25 rounded-xl p-3.5 text-xs text-cyan-300 overflow-x-auto my-3.5 whitespace-pre shadow-inner font-mono relative pl-10; 
+}
+:deep(.html-block)::before {
+  content: '🌐 HTML';
+  @apply absolute left-3 top-2.5 text-[8px] font-bold text-cyan-500 bg-cyan-950 border border-cyan-900 px-1.5 py-0.5 rounded uppercase tracking-widest font-sans;
+}
+:deep(.code-block) { 
+  @apply bg-zinc-950/60 border border-white/5 rounded-xl p-3.5 text-xs text-zinc-300 overflow-x-auto my-3.5 whitespace-pre shadow-inner font-mono; 
+}
+
+/* Markdown styling inside AI bubble */
+:deep(.bubble-ai p) { @apply mb-2.5 last:mb-0; }
+:deep(.bubble-ai strong) { @apply font-extrabold text-white; }
 :deep(.bubble-ai em) { @apply italic text-zinc-300; }
-:deep(.bubble-ai ul) { @apply list-disc pl-5 mb-2; }
-:deep(.bubble-ai ol) { @apply list-decimal pl-5 mb-2; }
+:deep(.bubble-ai ul) { @apply list-disc pl-5 mb-3; }
+:deep(.bubble-ai ol) { @apply list-decimal pl-5 mb-3; }
 :deep(.bubble-ai li) { @apply mb-1; }
 :deep(.bubble-ai code) { @apply bg-black/40 rounded px-1.5 py-0.5 text-xs font-mono text-pink-400 border border-white/5; }
-:deep(.bubble-ai pre) { @apply bg-zinc-950/80 border border-white/5 rounded-xl p-3.5 overflow-x-auto text-xs font-mono mb-2.5 whitespace-pre text-zinc-300 shadow-inner; }
+:deep(.bubble-ai pre) { @apply bg-zinc-950/80 border border-white/5 rounded-xl p-3.5 overflow-x-auto text-xs font-mono mb-3.5 whitespace-pre text-zinc-300 shadow-inner; }
 :deep(.bubble-ai pre code) { @apply bg-transparent border-0 p-0; }
-:deep(.bubble-ai h1, .bubble-ai h2, .bubble-ai h3) { @apply font-bold mb-2 mt-3 text-white; }
-:deep(.bubble-ai blockquote) { @apply border-l-2 border-[var(--primary)] pl-3 italic text-zinc-400 mb-2; }
-:deep(.bubble-ai a) { @apply text-[var(--primary)] hover:underline; }
-:deep(.bubble-ai hr) { @apply border-white/5 my-3; }
+:deep(.bubble-ai h1, .bubble-ai h2, .bubble-ai h3) { @apply font-bold mb-2 mt-4 text-white; }
+:deep(.bubble-ai blockquote) { @apply border-l-2 border-[var(--primary)] pl-3 italic text-zinc-400 mb-3 bg-white/2 py-1.5 pr-2 rounded-r-lg; }
+:deep(.bubble-ai a) { @apply text-[var(--primary)] hover:underline font-bold; }
+:deep(.bubble-ai hr) { @apply border-white/5 my-3.5; }
+
+/* Transition Slide Pane animation */
+.slide-pane-enter-active,
+.slide-pane-leave-active {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease-in-out;
+}
+.slide-pane-enter-from,
+.slide-pane-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
 </style>
+
