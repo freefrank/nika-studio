@@ -1354,7 +1354,7 @@ const progressPct = computed(() =>
           
           <div class="flex flex-col gap-2.5 max-h-[60vh] overflow-y-auto pr-1 scroll-thin">
             <div v-for="entry in worldbook.entries" :key="entry.id"
-              class="bg-zinc-900/35 border border-white/5 rounded-2xl p-4 text-xs shadow-inner hover:border-purple-500/10 transition-all animate-fade-in flex flex-col relative overflow-hidden">
+              class="bg-zinc-900/35 border border-white/5 rounded-2xl p-4 text-xs shadow-inner hover:border-purple-500/10 transition-all animate-fade-in flex flex-col relative overflow-hidden shrink-0">
               <div class="text-[var(--primary)] font-extrabold mb-1.5 flex items-center justify-between">
                 <span class="text-zinc-100 text-sm">{{ entry.comment || '未命名分类' }}</span>
                 <span class="text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-md font-mono">🔑 {{ entry.keys.join(', ') || '(无触发词)' }}</span>
@@ -1362,18 +1362,19 @@ const progressPct = computed(() =>
               
               <div 
                 class="markdown-body text-zinc-300 mt-2 border-t border-white/5 pt-2 select-text font-medium"
-                :class="isExpanded(entry.id) ? 'pb-6' : (isContentLong(entry.content) ? 'max-h-[72px] overflow-hidden mask-gradient pb-6' : 'pb-2')"
+                :class="isExpanded(entry.id) ? 'pb-2' : (isContentLong(entry.content) ? 'max-h-[72px] overflow-hidden mask-gradient pb-2' : 'pb-2')"
                 v-html="renderMarkdown(entry.content)"
               />
 
-              <!-- Floating Toggle Button -->
-              <button 
-                v-if="isContentLong(entry.content)"
-                @click="toggleEntry(entry.id)" 
-                class="absolute bottom-2.5 right-3 text-[10px] text-purple-400 hover:text-purple-300 font-bold bg-zinc-950/90 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.5)] z-10 transition-all active:scale-95 cursor-pointer select-none"
-              >
-                {{ isExpanded(entry.id) ? '▲ 收起' : '▼ 展开' }}
-              </button>
+              <!-- Toggle Button -->
+              <div v-if="isContentLong(entry.content)" class="flex justify-end mt-2 pt-1 border-t border-white/3">
+                <button 
+                  @click="toggleEntry(entry.id)" 
+                  class="text-[10px] text-purple-400 hover:text-purple-300 font-bold flex items-center gap-0.5 transition-colors cursor-pointer select-none"
+                >
+                  <span>{{ isExpanded(entry.id) ? '▲ 收起' : '▼ 展开' }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
