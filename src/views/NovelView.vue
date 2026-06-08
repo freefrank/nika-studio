@@ -23,6 +23,8 @@ const progress = ref({ current: 0, total: 0 })
 const abortCtrl = ref<AbortController | null>(null)
 const splitSize = ref(3000)
 const incrementalMode = ref(true) // 增量模式：只输出新增/变更条目
+const currentPrompt = ref('')
+const currentResponse = ref('')
 
 // 自定义分类系统
 interface Category {
@@ -176,6 +178,8 @@ async function generateWorldbook() {
   const cfg = settingsService.get().apiConfig
   processing.value = true
   abortCtrl.value = new AbortController()
+  currentPrompt.value = ''
+  currentResponse.value = ''
   if (!incrementalMode.value) {
     worldbook.value = { name: fileName.value.replace(/\.[^.]+$/, ''), entries: [] }
   } else if (!worldbook.value.name) {
@@ -193,7 +197,12 @@ async function generateWorldbook() {
     progress.value.current++
     try {
       let json = ''
-      await streamChat(cfg, [{ role: 'user', content: buildPrompt(seg) }], d => { json += d }, abortCtrl.value.signal)
+      currentPrompt.value = buildPrompt(seg)
+      currentResponse.value = ''
+      await streamChat(cfg, [{ role: 'user', content: currentPrompt.value }], d => {
+        json += d
+        currentResponse.value = json
+      }, abortCtrl.value.signal)
       const match = json.match(/\[[\s\S]*\]/)
       if (match) {
         const entries: { category?: string; keys: string[]; comment?: string; content: string }[] = JSON.parse(match[0])
@@ -368,14 +377,36 @@ const progressPct = computed(() =>
         </button>
       </div>
 
-      <!-- Progress Tracking -->
-      <div v-if="processing || progress.total > 0" class="glass-card p-5 rounded-2xl border border-white/5 shadow-sm animate-fade-in flex flex-col gap-2">
+      <!-- Progress Tracking & LLM Streams -->
+      <div v-if="processing || progress.total > 0" class="glass-card p-5 rounded-2xl border border-white/5 shadow-sm animate-fade-in flex flex-col gap-4">
+        <!-- Progress Bar Header -->
         <div class="flex justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
           <span>{{ processing ? 'AI 正在全力提取剧情中...' : '设定提取已完成' }} (已处理：{{ progress.current }}/{{ progress.total }})</span>
           <span class="text-purple-400 font-mono font-bold">{{ progressPct }}%</span>
         </div>
         <div class="h-2.5 bg-zinc-950 rounded-full overflow-hidden border border-white/5 shadow-inner">
           <div class="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 transition-all duration-300 animate-pulse" :style="{ width: progressPct + '%' }" />
+        </div>
+
+        <!-- Prompt vs Response Grid -->
+        <div v-if="processing && (currentPrompt || currentResponse)" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2 border-t border-white/5 pt-4 animate-fade-in">
+          <!-- Left Column: Prompt -->
+          <div class="flex flex-col gap-1.5 min-w-0">
+            <h5 class="text-[9px] font-extrabold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+              <span>发送给大模型的 Prompt (片段 {{ progress.current }})</span>
+            </h5>
+            <textarea readonly :value="currentPrompt" class="input font-mono text-[10px] leading-relaxed resize-none h-48 bg-zinc-950/60 text-zinc-300 border border-white/5 scroll-thin" />
+          </div>
+
+          <!-- Right Column: Streaming Response -->
+          <div class="flex flex-col gap-1.5 min-w-0">
+            <h5 class="text-[9px] font-extrabold text-purple-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
+              <span>大模型实时回复 (Streaming JSON Response)</span>
+            </h5>
+            <textarea readonly :value="currentResponse" class="input font-mono text-[10px] leading-relaxed resize-none h-48 bg-zinc-950/60 text-purple-300 border border-purple-500/10 shadow-[0_0_15px_rgba(168,85,247,0.05)] scroll-thin" />
+          </div>
         </div>
       </div>
 
@@ -426,5 +457,21 @@ const progressPct = computed(() =>
 }
 .label { 
   @apply text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider select-none; 
+}
+
+/* Scrollbar styling for code views */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.05) transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
 }
 </style>
