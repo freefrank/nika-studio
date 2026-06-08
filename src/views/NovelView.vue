@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = withDefaults(defineProps<{ standalone?: boolean }>(), { standalone: true })
@@ -7,6 +7,7 @@ import { settingsService } from '@/services/settingsService'
 import { streamChat } from '@/services/apiService'
 import { useCharacterStore } from '@/stores/characterStore'
 import type { Character, WorldBook, WorldBookEntry } from '@/types'
+import { openDB, tx, cloneForStorage } from '@/services/db'
 
 const router = useRouter()
 const charStore = useCharacterStore()
@@ -16,7 +17,7 @@ const fileName = ref('')
 const encoding = ref('auto')
 const fileInputEl = ref<HTMLInputElement | null>(null)
 const chapterRegex = ref('第[零一二三四五六七八九十百千\\d]+[章节回幕]')
-const chapters = ref<{ title: string; content: string }[]>([])
+const chapters = ref<{ title: string; content: string; processed?: boolean; failed?: boolean; error?: string }[]>([])
 const worldbook = ref<WorldBook>({ name: '', entries: [] })
 const processing = ref(false)
 const progress = ref({ current: 0, total: 0 })
@@ -27,6 +28,12 @@ const enablePlotOutline = ref(true)
 const enableLiteraryStyle = ref(false)
 const currentPrompt = ref('')
 const currentResponse = ref('')
+
+const localGeneratedWorldbookRef = ref<any>({})
+const hasSavedState = ref(false)
+const savedStateInfo = ref({ fileName: '', progress: '', percent: 0 })
+const STATE_DB = 'NikaNovelStateDB'
+const STATE_STORE = 'novel_state'
 
 // 自定义分类系统
 interface Category {
@@ -198,7 +205,7 @@ function detectChapters() {
     if (matches && matches.length > 0) {
       const matchTexts = matches.map(match => match[0].trim())
       
-      const result: { title: string; content: string }[] = []
+      const result: { title: string; content: string; processed?: boolean; failed?: boolean; error?: string }[] = []
       for (let i = 0; i < matches.length; i++) {
         const startIndex = matches[i].index!
         const endIndex = i < matches.length - 1 ? matches[i + 1].index! : fileContent.value.length
@@ -208,7 +215,12 @@ function detectChapters() {
         const title = matchTexts[i] || `第${i + 1}章`
         
         if (chapterContent.length > 50) {
-          result.push({ title, content: chapterContent })
+          result.push({
+            title,
+            content: chapterContent,
+            processed: false,
+            failed: false
+          })
         }
       }
       chapters.value = result
@@ -668,6 +680,116 @@ ${seg}
   return prompt
 }
 
+async function saveState(currentIndex: number) {
+  try {
+    const db = await openDB(STATE_DB, 1, db => {
+      if (!db.objectStoreNames.contains(STATE_STORE)) {
+        db.createObjectStore(STATE_STORE, { keyPath: 'key' })
+      }
+    })
+    
+    const state = cloneForStorage({
+      key: 'current_state',
+      fileName: fileName.value,
+      fileContent: fileContent.value,
+      encoding: encoding.value,
+      chapterRegex: chapterRegex.value,
+      chapters: chapters.value,
+      incrementalMode: incrementalMode.value,
+      enablePlotOutline: enablePlotOutline.value,
+      enableLiteraryStyle: enableLiteraryStyle.value,
+      splitSize: splitSize.value,
+      localGeneratedWorldbook: localGeneratedWorldbookRef.value,
+      progressCurrent: currentIndex,
+      progressTotal: progress.value.total,
+      lastUpdate: Date.now()
+    })
+    
+    await tx(db, STATE_STORE, 'readwrite', s => s.put(state))
+  } catch (e) {
+    console.error('Failed to auto-save progress:', e)
+  }
+}
+
+async function checkSavedState() {
+  try {
+    const db = await openDB(STATE_DB, 1, db => {
+      if (!db.objectStoreNames.contains(STATE_STORE)) {
+        db.createObjectStore(STATE_STORE, { keyPath: 'key' })
+      }
+    })
+    const state = await tx(db, STATE_STORE, 'readonly', s => s.get('current_state'))
+    if (state) {
+      hasSavedState.value = true
+      const processed = state.chapters.filter((c: any) => c.processed).length
+      const total = state.chapters.length
+      const pct = total ? Math.round((processed / total) * 100) : 0
+      savedStateInfo.value = {
+        fileName: state.fileName,
+        progress: `${processed}/${total}`,
+        percent: pct
+      }
+    } else {
+      hasSavedState.value = false
+    }
+  } catch (e) {
+    console.error('Failed to check saved state:', e)
+  }
+}
+
+async function restoreSavedState() {
+  try {
+    const db = await openDB(STATE_DB, 1, db => {
+      if (!db.objectStoreNames.contains(STATE_STORE)) {
+        db.createObjectStore(STATE_STORE, { keyPath: 'key' })
+      }
+    })
+    const state = await tx(db, STATE_STORE, 'readonly', s => s.get('current_state'))
+    if (state) {
+      fileName.value = state.fileName
+      fileContent.value = state.fileContent
+      encoding.value = state.encoding
+      chapterRegex.value = state.chapterRegex
+      chapters.value = state.chapters
+      incrementalMode.value = state.incrementalMode
+      enablePlotOutline.value = state.enablePlotOutline
+      enableLiteraryStyle.value = state.enableLiteraryStyle
+      splitSize.value = state.splitSize
+      localGeneratedWorldbookRef.value = state.localGeneratedWorldbook
+      
+      worldbook.value.name = state.fileName.replace(/\.[^.]+$/, '')
+      worldbook.value.entries = convertGeneratedWorldbookToStandard(state.localGeneratedWorldbook)
+      
+      progress.value = {
+        current: state.progressCurrent,
+        total: state.progressTotal
+      }
+      
+      hasSavedState.value = false
+    }
+  } catch (e) {
+    console.error('Failed to restore saved state:', e)
+  }
+}
+
+async function discardSavedState() {
+  try {
+    const db = await openDB(STATE_DB, 1, db => {
+      if (!db.objectStoreNames.contains(STATE_STORE)) {
+        db.createObjectStore(STATE_STORE, { keyPath: 'key' })
+      }
+    })
+    await tx(db, STATE_STORE, 'readwrite', s => s.delete('current_state'))
+    hasSavedState.value = false
+  } catch (e) {
+    console.error('Failed to discard saved state:', e)
+  }
+}
+
+onMounted(() => {
+  checkSavedState()
+})
+
 async function generateWorldbook() {
   if (!fileContent.value) return
   const cfg = settingsService.get().apiConfig
@@ -676,49 +798,58 @@ async function generateWorldbook() {
   currentPrompt.value = ''
   currentResponse.value = ''
   
-  let localGeneratedWorldbook: any = {}
+  let localGeneratedWorldbook = localGeneratedWorldbookRef.value
 
-  if (!incrementalMode.value) {
-    worldbook.value = { name: fileName.value.replace(/\.[^.]+$/, ''), entries: [] }
-  } else if (!worldbook.value.name) {
-    worldbook.value.name = fileName.value.replace(/\.[^.]+$/, '')
-  }
-
-  if (incrementalMode.value && worldbook.value.entries.length > 0) {
-    worldbook.value.entries.forEach(entry => {
-      const match = entry.comment.match(/^\[(.*?)\]\s*(.*)$/)
-      let category = '知识书'
-      let itemName = entry.comment
-      if (match) {
-        category = match[1]
-        itemName = match[2]
-      }
-      if (!localGeneratedWorldbook[category]) {
-        localGeneratedWorldbook[category] = {}
-      }
-      localGeneratedWorldbook[category][itemName] = {
-        '关键词': entry.keys,
-        '内容': entry.content
-      }
-    })
-  } else {
-    localGeneratedWorldbook = {
-      '角色': {},
-      '地点': {},
-      '组织': {},
-      '知识书': {}
+  if (Object.keys(localGeneratedWorldbook).length === 0) {
+    if (!incrementalMode.value) {
+      worldbook.value = { name: fileName.value.replace(/\.[^.]+$/, ''), entries: [] }
+    } else if (!worldbook.value.name) {
+      worldbook.value.name = fileName.value.replace(/\.[^.]+$/, '')
     }
+
+    if (incrementalMode.value && worldbook.value.entries.length > 0) {
+      worldbook.value.entries.forEach(entry => {
+        const match = entry.comment.match(/^\[(.*?)\]\s*(.*)$/)
+        let category = '知识书'
+        let itemName = entry.comment
+        if (match) {
+          category = match[1]
+          itemName = match[2]
+        }
+        if (!localGeneratedWorldbook[category]) {
+          localGeneratedWorldbook[category] = {}
+        }
+        localGeneratedWorldbook[category][itemName] = {
+          '关键词': entry.keys,
+          '内容': entry.content
+        }
+      })
+    } else {
+      localGeneratedWorldbook = {
+        '角色': {},
+        '地点': {},
+        '组织': {},
+        '知识书': {}
+      }
+    }
+    localGeneratedWorldbookRef.value = localGeneratedWorldbook
   }
 
   const segments = chapters.value.length > 0
     ? chapters.value.map(c => `【${c.title}】\n${c.content}`)
     : chunkText(fileContent.value, splitSize.value)
 
-  progress.value = { current: 0, total: segments.length }
+  progress.value = { current: progress.value.current || 0, total: segments.length }
 
   for (let idx = 0; idx < segments.length; idx++) {
     if (abortCtrl.value.signal.aborted) break
-    progress.value.current++
+
+    // Skip already successfully processed chapters
+    if (chapters.value.length > 0 && chapters.value[idx]?.processed) {
+      continue
+    }
+
+    progress.value.current = idx + 1
     const seg = segments[idx]
     
     try {
@@ -814,15 +945,8 @@ ${cleanResponse}
               
               try {
                 memoryUpdate = JSON.parse(cleanedFixed)
-              } catch (fixErr) {
-                memoryUpdate = {
-                  '知识书': {
-                    [`第${idx + 1}章_解析失败`]: {
-                      '关键词': ['解析失败', '格式错误'],
-                      '内容': `**解析失败原因**: ${secondError.message}\n\n**原始响应预览**:\n${cleanResponse}`
-                    }
-                  }
-                }
+              } catch (fixErr: any) {
+                throw new Error(`JSON解析失败且自动修复失败: ${secondError.message}. 纠正错误: ${fixErr.message}`)
               }
             }
           }
@@ -836,12 +960,36 @@ ${cleanResponse}
           mergeWorldbookData(localGeneratedWorldbook, memoryUpdate)
         }
         worldbook.value.entries = convertGeneratedWorldbookToStandard(localGeneratedWorldbook)
+        
+        if (chapters.value[idx]) {
+          chapters.value[idx].processed = true
+          chapters.value[idx].failed = false
+          chapters.value[idx].error = undefined
+        }
       }
-    } catch (err: unknown) {
-      if ((err as Error)?.name === 'AbortError') break
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        break
+      }
+      console.error(`处理章节 ${idx + 1} 时出错:`, err)
+      if (chapters.value[idx]) {
+        chapters.value[idx].processed = false
+        chapters.value[idx].failed = true
+        chapters.value[idx].error = err.message || '未知错误'
+      }
     }
+    
+    // Auto-save state
+    await saveState(idx + 1)
   }
+  
   processing.value = false
+  
+  // If all chapters are processed successfully, discard state
+  const hasFailed = chapters.value.some(c => c.failed)
+  if (!hasFailed && progress.value.current >= segments.length) {
+    await discardSavedState()
+  }
 }
 
 function stopProcessing() { abortCtrl.value?.abort() }
@@ -891,6 +1039,21 @@ const progressPct = computed(() =>
       <!-- Left Column: Inputs & Controls (Sticky on Desktop) -->
       <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-4 lg:sticky lg:top-20">
         
+        <!-- Resume Progress Banner -->
+        <div v-if="hasSavedState" class="glass-card rounded-2xl p-4 border border-purple-500/20 bg-purple-500/5 flex flex-col gap-2.5 shadow-md animate-fade-in">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">⏳</span>
+            <div class="flex flex-col flex-1">
+              <span class="text-xs font-bold text-zinc-100">检测到上次的分析进度</span>
+              <span class="text-[10px] text-zinc-400 mt-0.5">文件: {{ savedStateInfo.fileName }} | 进度: {{ savedStateInfo.progress }} ({{ savedStateInfo.percent }}%)</span>
+            </div>
+          </div>
+          <div class="flex gap-2 justify-end">
+            <button @click="discardSavedState" class="btn-secondary text-[10px] py-1.5 px-3 rounded-lg text-zinc-400">放弃并清除</button>
+            <button @click="restoreSavedState" class="btn-primary text-[10px] py-1.5 px-3 rounded-lg font-bold">恢复进度</button>
+          </div>
+        </div>
+
         <!-- Upload Drop Zone -->
         <div @dragover.prevent @drop="onDrop"
           class="group border-2 border-dashed border-white/10 hover:border-purple-500/40 bg-zinc-950/20 hover:bg-purple-500/5 rounded-2xl p-6 text-center transition-all duration-300 cursor-pointer shadow-inner flex flex-col items-center justify-center min-h-[140px] hover:scale-[1.005]"
@@ -993,12 +1156,22 @@ const progressPct = computed(() =>
           </div>
         </div>
 
-        <!-- Chapters Preview -->
-        <div v-if="chapters.length" class="glass-card rounded-2xl p-4 border border-white/5 shadow-sm animate-fade-in">
-          <h4 class="text-[10px] font-bold text-zinc-400 mb-2.5 uppercase tracking-wider">自动识别到 {{ chapters.length }} 个章节</h4>
-          <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1 scroll-thin">
-            <span v-for="(c, idx) in chapters.slice(0, 20)" :key="c.title + '-' + idx" class="text-[9px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2 py-0.5 rounded-md">{{ c.title }}</span>
-            <span v-if="chapters.length > 20" class="text-[10px] text-[var(--text-muted)] flex items-center pl-1 font-bold">...等其余 {{ chapters.length - 20 }} 章节</span>
+        <!-- Chapters Preview with Status Marks -->
+        <div v-if="chapters.length" class="glass-card rounded-2xl p-4 border border-white/5 shadow-sm animate-fade-in flex flex-col gap-2">
+          <div class="flex justify-between items-center mb-1">
+            <h4 class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">章节处理进度 (已完成：{{ chapters.filter(c=>c.processed).length }}/{{ chapters.length }})</h4>
+          </div>
+          <div class="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1 scroll-thin">
+            <div v-for="(c, idx) in chapters" :key="c.title + '-' + idx" 
+              class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-zinc-950/40 border border-white/5 hover:bg-zinc-900/10 transition-colors">
+              <span class="truncate font-bold text-zinc-200 pr-2" :class="{'text-emerald-400': c.processed, 'text-rose-400': c.failed}">{{ c.title }}</span>
+              <span class="flex items-center gap-1.5 shrink-0 select-none">
+                <span v-if="c.processed" class="text-[9px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">✔️ 已完成</span>
+                <span v-else-if="c.failed" class="text-[9px] font-extrabold bg-rose-500/15 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-md cursor-help" :title="c.error">❌ 失败</span>
+                <span v-else-if="processing && progress.current === idx + 1" class="text-[9px] font-extrabold bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-md animate-pulse">⚡ 处理中</span>
+                <span v-else class="text-[9px] font-extrabold bg-zinc-800/30 text-zinc-500 border border-zinc-800/40 px-2 py-0.5 rounded-md">⏳ 等待中</span>
+              </span>
+            </div>
           </div>
         </div>
 
