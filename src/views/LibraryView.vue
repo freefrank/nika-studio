@@ -73,7 +73,7 @@ async function importCharacter(e: Event) {
 </script>
 
 <template>
-  <div class="min-h-screen lg:h-screen lg:overflow-hidden bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-6">
+  <div class="h-full min-h-0 bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up overflow-hidden">
     <!-- Header -->
     <header class="sticky top-0 z-30 w-full glass-panel border-b border-white/5 px-6 py-4 flex items-center justify-between shadow-lg shadow-black/10">
       <div class="flex items-center gap-3">
@@ -105,7 +105,7 @@ async function importCharacter(e: Event) {
 
     <!-- ══ Characters Tab ══ -->
     <template v-if="activeTab === 'characters'">
-      <div class="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6 flex-1 lg:overflow-y-auto lg:pr-1 scroll-thin">
+      <div class="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6 flex-1 min-h-0 lg:overflow-y-auto lg:pr-1 scroll-thin">
         <!-- Controls -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <!-- Action buttons -->
@@ -211,7 +211,7 @@ async function importCharacter(e: Event) {
     </template>
 
     <!-- ══ Novel Tab ══ -->
-    <NovelView v-else :standalone="false" class="flex-1 max-w-7xl mx-auto w-full px-6" />
+    <NovelView v-else :standalone="false" class="flex-1 min-h-0 max-w-7xl mx-auto w-full px-6" />
   </div>
 </template>
 
@@ -239,4 +239,3 @@ async function importCharacter(e: Event) {
   @apply text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2 py-0.5 rounded-md;
 }
 </style>
-

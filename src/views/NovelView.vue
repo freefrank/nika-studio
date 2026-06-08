@@ -82,49 +82,49 @@ const DEFAULT_CATEGORIES: Category[] = [
     enabled: true,
     entryExample: "角色真实姓名",
     keywordsExample: ["真实姓名", "称呼1", "称呼2", "绰号"],
-    contentGuide: "基于原文的角色描述，包含但不限于**名称**:（必须要）、**性别**:、**MBTI(必须要，如变化请说明背景)**:、**貌龄**:、**年龄**:、**身份**:、**背景**:、**性格**:、**外貌**:、**技能**:、**重要事件**:、**话语示例**:、**弱点**:、**背景故事**:等（实际嵌套或者排列方式按合理的逻辑）"
+    contentGuide: "**名称**(必填)、性别、MBTI(变化需说明背景)、貌龄、年龄、身份、背景、性格、外貌、技能、重要事件、话语示例、弱点、背景故事"
   },
   {
     name: "地点",
     enabled: true,
     entryExample: "地点真实名称",
     keywordsExample: ["地点名", "别称", "俗称"],
-    contentGuide: "基于原文的地点描述，包含但不限于**名称**:（必须要）、**位置**:、**特征**:、**重要事件**:等（实际嵌套或者排列方式按合理的逻辑）"
+    contentGuide: "**名称**(必填)、位置、特征、重要事件"
   },
   {
     name: "组织",
     enabled: true,
     entryExample: "组织真实名称",
     keywordsExample: ["组织名", "简称", "代号"],
-    contentGuide: "基于原文的组织描述，包含但不限于**名称**:（必须要）、**性质**:、**成员**:、**目标**:等（实际嵌套或者排列方式按合理的逻辑）"
+    contentGuide: "**名称**(必填)、性质、成员、目标"
   },
   {
     name: "道具",
     enabled: false,
     entryExample: "道具名称",
     keywordsExample: ["道具名", "别名"],
-    contentGuide: "基于原文的道具描述，包含但不限于**名称**:、**类型**:、**功能**:、**来源**:、**持有者**:等"
+    contentGuide: "名称、类型、功能、来源、持有者"
   },
   {
     name: "玩法",
     enabled: false,
     entryExample: "玩法名称",
     keywordsExample: ["玩法名", "规则名"],
-    contentGuide: "基于原文的玩法/规则描述，包含但不限于**名称**:、**规则说明**:、**参与条件**:、**奖惩机制**:等"
+    contentGuide: "名称、规则说明、参与条件、奖惩机制"
   },
   {
     name: "章节剧情",
     enabled: false,
     entryExample: "第X章",
     keywordsExample: ["章节名", "章节号"],
-    contentGuide: "该章节的剧情概要，包含但不限于**章节标题**:、**主要事件**:、**出场角色**:、**关键转折**:、**伏笔线索**:等"
+    contentGuide: "章节标题、主要事件、出场角色、关键转折、伏笔线索"
   },
   {
     name: "角色内心",
     enabled: false,
     entryExample: "角色名-内心世界",
     keywordsExample: ["角色名", "内心", "心理"],
-    contentGuide: "角色的内心想法和心理活动，包含但不限于**（角色名）的（某个时期）的内心世界**：、****原文内容**:、**内心独白**:、**情感变化**:、**动机分析**:、**心理矛盾**:等"
+    contentGuide: "角色时期、原文内容、内心独白、情感变化、动机分析、心理矛盾"
   }
 ]
 
@@ -140,7 +140,7 @@ function addCategory() {
     enabled: true,
     entryExample: `${n}名称`,
     keywordsExample: [`${n}名`, `别名`],
-    contentGuide: `基于原文的${n}描述，包含但不限于**名称**:、**特征**:等`
+    contentGuide: "名称、特征"
   })
   newCatName.value = ''
 }
@@ -1530,20 +1530,17 @@ const progressPct = computed(() =>
   progress.value.total ? Math.round(progress.value.current / progress.value.total * 100) : 0
 )
 
-const workspaceHeight = computed(() => {
-  return props.standalone ? 'calc(100vh - 100px)' : 'calc(100vh - 220px)'
-})
 </script>
 
 <template>
-  <div :class="standalone ? 'min-h-screen lg:h-screen lg:overflow-hidden bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-6' : 'flex flex-col h-full lg:overflow-hidden pb-6'">
+  <div :class="standalone ? 'h-full min-h-0 overflow-y-auto lg:h-screen lg:overflow-hidden bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-6 lg:pb-0' : 'flex flex-col h-full min-h-0 overflow-y-auto lg:overflow-hidden pb-0'">
     <!-- Header -->
     <header v-if="standalone" class="flex items-center gap-3 px-5 py-3.5 bg-[var(--bg-2)]/85 backdrop-blur-md border-b border-white/5 sticky top-0 z-20 shadow-md">
       <button @click="router.push('/')" class="btn-back-arrow">←</button>
       <span class="font-extrabold text-sm md:text-base tracking-wide text-gradient-primary flex-1">📚 小说转世界书 (Novel to Lorebook)</span>
     </header>
 
-    <div class="flex-1 max-w-7xl mx-auto w-full p-5 flex flex-col lg:flex-row gap-6 items-stretch novel-workspace-container animate-fade-in">
+    <div class="lg:flex-1 lg:min-h-0 max-w-7xl mx-auto w-full p-5 flex flex-col lg:flex-row gap-6 items-stretch novel-workspace-container animate-fade-in">
       <!-- Left Column: Inputs & Controls (Scrollable on Desktop) -->
       <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-4 novel-column-scrollable lg:pr-2 scroll-thin">
         
@@ -1667,7 +1664,7 @@ const workspaceHeight = computed(() => {
       </div>
 
       <!-- Right Column: Live Output & Results (Scrollable on Desktop) -->
-      <div class="flex-1 w-full min-w-0 flex flex-col gap-5 novel-column-scrollable lg:pr-2 scroll-thin">
+      <div class="w-full min-w-0 flex flex-col gap-5 novel-column-scrollable lg:flex-1 lg:pr-2 scroll-thin">
         
         <!-- Action Button -->
         <div class="flex gap-2.5 shrink-0">
@@ -1855,6 +1852,10 @@ const workspaceHeight = computed(() => {
   -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
 }
 
+.novel-column-scrollable > * {
+  flex-shrink: 0;
+}
+
 /* Markdown content styling */
 .markdown-body :deep(p) {
   @apply mb-2 last:mb-0 leading-relaxed;
@@ -1880,13 +1881,14 @@ const workspaceHeight = computed(() => {
 
 @media (min-width: 1024px) {
   .novel-workspace-container {
-    height: v-bind(workspaceHeight) !important;
+    height: 100%;
+    min-height: 0;
     overflow: hidden;
   }
   .novel-column-scrollable {
-    height: 100% !important;
-    overflow-y: auto !important;
-    min-height: 0 !important;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
   }
 }
 </style>
