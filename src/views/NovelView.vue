@@ -438,6 +438,222 @@ function normalizeWorldbookData(data: any) {
   return data;
 }
 
+function parseStructuredCharacter(text: string): Record<string, string> {
+  const result: Record<string, string> = {}
+  const defaultFields = [
+    '名称', '性别', 'MBTI', '貌龄', '年龄', '身份', '背景', 
+    '性格', '外貌', '技能', '重要事件', '话语示例', '弱点', '背景故事'
+  ]
+  const fieldNames = [...defaultFields]
+  
+  // Discover other fields in the text dynamically
+  const fieldRegex = /(?:^|\n|\s)(?:\*\*([^\*：:]+)\*\*|([^\*：:\s\d]+))[:：]/g
+  let match
+  while ((match = fieldRegex.exec(text)) !== null) {
+    const name = (match[1] || match[2]).trim()
+    if (name && !fieldNames.includes(name) && name.length < 15 && isNaN(Number(name))) {
+      fieldNames.push(name)
+    }
+  }
+  
+  const nextFieldsPattern = fieldNames
+    .map(f => {
+      const escaped = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      return `\\*\\*${escaped}\\*\\*[:：]|${escaped}[:：]`
+    })
+    .join('|')
+    
+  fieldNames.forEach(field => {
+    const escapedField = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regex = new RegExp(
+      `(?:\\*\\*${escapedField}\\*\\*[:：]|${escapedField}[:：])\\s*([\\s\\S]*?)(?=\\s*(?:${nextFieldsPattern})|$)`,
+      'i'
+    )
+    const m = text.match(regex)
+    if (m) {
+      result[field] = m[1].trim()
+    }
+  })
+  
+  return result
+}
+
+function calculateJaccardSimilarity(str1: string, str2: string): number {
+  const set1 = new Set(str1.split(''))
+  const set2 = new Set(str2.split(''))
+  const intersection = new Set([...set1].filter(x => set2.has(x)))
+  const union = new Set([...set1, ...set2])
+  return union.size > 0 ? intersection.size / union.size : 0
+}
+
+function parseEventsList(eventsStr: string): string[] {
+  const items: string[] = []
+  const splitRegex = /(?:^\s*\d+[\.\、\s]+|^\s*[-*+•]\s+)/gm
+  const rawParts = eventsStr.split(splitRegex)
+  rawParts.forEach(p => {
+    const cleaned = p.trim().replace(/\s+/g, ' ')
+    if (cleaned) {
+      items.push(cleaned)
+    }
+  })
+  
+  if (items.length === 0) {
+    eventsStr.split(/[\n;；。]+/).forEach(p => {
+      const cleaned = p.trim()
+      if (cleaned) items.push(cleaned)
+    })
+  }
+  
+  return items
+}
+
+function mergeEvents(tEventsStr: string, sEventsStr: string): string {
+  const tList = parseEventsList(tEventsStr)
+  const sList = parseEventsList(sEventsStr)
+  const mergedList: string[] = [...tList]
+  
+  sList.forEach(sItem => {
+    const isDuplicate = mergedList.some(tItem => {
+      if (tItem.includes(sItem) || sItem.includes(tItem)) return true
+      return calculateJaccardSimilarity(tItem, sItem) > 0.8
+    })
+    if (!isDuplicate) {
+      mergedList.push(sItem)
+    }
+  })
+  
+  return mergedList.map((item, idx) => `${idx + 1}. ${item}`).join('\n')
+}
+
+function parseSkills(skillsStr: string): { name: string; detail: string }[] {
+  const list = skillsStr.split(/[、,，;；\n]+/)
+  const result: { name: string; detail: string }[] = []
+  
+  list.forEach(item => {
+    const cleaned = item.trim().replace(/[。\.]$/, '')
+    if (!cleaned) return
+    const match = cleaned.match(/^([^\(（]+)([\(（].*[\)）])?$/)
+    if (match) {
+      result.push({
+        name: match[1].trim(),
+        detail: (match[2] || '').trim()
+      })
+    } else {
+      result.push({ name: cleaned, detail: '' })
+    }
+  })
+  
+  return result
+}
+
+function mergeSkills(tSkillsStr: string, sSkillsStr: string): string {
+  const tList = parseSkills(tSkillsStr)
+  const sList = parseSkills(sSkillsStr)
+  const mergedMap = new Map<string, string>()
+  
+  tList.forEach(s => mergedMap.set(s.name, s.detail))
+  sList.forEach(s => {
+    const existingDetail = mergedMap.get(s.name)
+    if (existingDetail) {
+      if (s.detail.length > existingDetail.length || s.detail.includes('级') && !existingDetail.includes('级')) {
+        mergedMap.set(s.name, s.detail)
+      } else {
+        const matchT = existingDetail.match(/(\d+)级/)
+        const matchS = s.detail.match(/(\d+)级/)
+        if (matchT && matchS) {
+          const levelT = parseInt(matchT[1], 10)
+          const levelS = parseInt(matchS[1], 10)
+          if (levelS > levelT) {
+            mergedMap.set(s.name, s.detail)
+          }
+        }
+      }
+    } else {
+      mergedMap.set(s.name, s.detail)
+    }
+  })
+  
+  return Array.from(mergedMap.entries())
+    .map(([name, detail]) => `${name}${detail}`)
+    .join('、')
+}
+
+function mergeTraits(tStr: string, sStr: string): string {
+  const splitRegex = /[，,。；;、\n]+/
+  const tParts = tStr.split(splitRegex).map(p => p.trim()).filter(Boolean)
+  const sParts = sStr.split(splitRegex).map(p => p.trim()).filter(Boolean)
+  const mergedParts = [...tParts]
+  
+  sParts.forEach(sPart => {
+    const isDuplicate = mergedParts.some(tPart => tPart.includes(sPart) || sPart.includes(tPart))
+    if (!isDuplicate) {
+      mergedParts.push(sPart)
+    }
+  })
+  
+  return mergedParts.join('，')
+}
+
+function isStructuredCharacter(text: string): boolean {
+  return text.includes('名称:') || text.includes('名称：')
+}
+
+function mergeStructuredCharacterStrings(tStr: string, sStr: string): string {
+  const tParsed = parseStructuredCharacter(tStr)
+  const sParsed = parseStructuredCharacter(sStr)
+  const allFields = Array.from(new Set([...Object.keys(tParsed), ...Object.keys(sParsed)]))
+  const preferredOrder = [
+    '名称', '性别', 'MBTI', '貌龄', '年龄', '身份', '背景', 
+    '性格', '外貌', '技能', '重要事件', '话语示例', '弱点', '背景故事'
+  ]
+  allFields.sort((a, b) => {
+    const idxA = preferredOrder.indexOf(a)
+    const idxB = preferredOrder.indexOf(b)
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB
+    if (idxA !== -1) return -1
+    if (idxB !== -1) return 1
+    return a.localeCompare(b)
+  })
+  
+  const merged: Record<string, string> = {}
+  allFields.forEach(field => {
+    const tVal = (tParsed[field] || '').trim()
+    const sVal = (sParsed[field] || '').trim()
+    
+    if (!tVal) {
+      merged[field] = sVal
+      return
+    }
+    if (!sVal) {
+      merged[field] = tVal
+      return
+    }
+    if (tVal === sVal) {
+      merged[field] = tVal
+      return
+    }
+    
+    if (field === '重要事件') {
+      merged[field] = mergeEvents(tVal, sVal)
+    } else if (field === '技能') {
+      merged[field] = mergeSkills(tVal, sVal)
+    } else {
+      if (tVal.includes(sVal)) {
+        merged[field] = tVal
+      } else if (sVal.includes(tVal)) {
+        merged[field] = sVal
+      } else {
+        merged[field] = mergeTraits(tVal, sVal)
+      }
+    }
+  })
+  
+  return allFields
+    .filter(f => merged[f])
+    .map(f => `${f}: ${merged[f]}`)
+    .join('\n')
+}
+
 function mergeWorldbookDataIncremental(target: any, source: any) {
   normalizeWorldbookData(source);
 
@@ -465,13 +681,13 @@ function mergeWorldbookDataIncremental(target: any, source: any) {
           const targetVal = (targetEntry['内容'] || '').trim();
           const sourceVal = (sourceEntry['内容'] || '').trim();
           if (targetVal !== sourceVal) {
-            if (targetVal.includes(sourceVal)) {
-              // Existing target content is more complete, keep it
+            if (isStructuredCharacter(targetVal) || isStructuredCharacter(sourceVal)) {
+              targetEntry['内容'] = mergeStructuredCharacterStrings(targetVal, sourceVal);
+            } else if (targetVal.includes(sourceVal)) {
+              // Keep target
             } else if (sourceVal.includes(targetVal)) {
-              // Newly extracted content is more complete, use it
               targetEntry['内容'] = sourceVal;
             } else {
-              // They are complementary, append the new information
               targetEntry['内容'] = targetVal + '\n\n' + sourceVal;
             }
           }
@@ -495,7 +711,9 @@ function mergeWorldbookData(target: any, source: any) {
         const targetVal = target[key].trim();
         const sourceVal = source[key].trim();
         if (targetVal !== sourceVal) {
-          if (targetVal.includes(sourceVal)) {
+          if (isStructuredCharacter(targetVal) || isStructuredCharacter(sourceVal)) {
+            target[key] = mergeStructuredCharacterStrings(targetVal, sourceVal);
+          } else if (targetVal.includes(sourceVal)) {
             // Keep target
           } else if (sourceVal.includes(targetVal)) {
             target[key] = sourceVal;
