@@ -1157,8 +1157,13 @@ const progressPct = computed(() =>
           </div>
         </div>
 
+      </div>
+
+      <!-- Right Column: Live Output & Results -->
+      <div class="flex-1 w-full min-w-0 flex flex-col gap-5">
+        
         <!-- Action Button -->
-        <div class="flex gap-2.5 shrink-0 mt-1">
+        <div class="flex gap-2.5 shrink-0">
           <button @click="generateWorldbook" :disabled="!fileContent || processing" class="btn-primary flex-1 py-3 text-xs font-extrabold shadow-lg shadow-purple-500/20">
             🔮 开始 AI 智能解析世界设定
           </button>
@@ -1167,11 +1172,6 @@ const progressPct = computed(() =>
           </button>
         </div>
 
-      </div>
-
-      <!-- Right Column: Live Output & Results -->
-      <div class="flex-1 w-full min-w-0 flex flex-col gap-5">
-        
         <!-- Chapters Preview with Status Marks (Collapsible) -->
         <div v-if="chapters.length" class="glass-card rounded-2xl border border-white/5 shadow-sm animate-fade-in flex flex-col overflow-hidden">
           <button @click="showChaptersList = !showChaptersList"
