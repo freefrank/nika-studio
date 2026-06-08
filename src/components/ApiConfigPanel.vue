@@ -99,49 +99,51 @@ async function deleteProfile(id: string) {
     </button>
 
     <!-- Edit form modal -->
-    <div v-if="showForm && editing" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-      <div class="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-md flex flex-col gap-4 shadow-2xl animate-slide-up">
-        <div class="flex justify-between items-center border-b border-white/5 pb-2">
-          <h3 class="font-extrabold text-sm text-white tracking-wide">🔧 配置 API 访问凭证</h3>
-          <button @click="showForm = false" class="text-[var(--text-muted)] hover:text-white text-sm">✕</button>
-        </div>
+    <Teleport to="body">
+      <div v-if="showForm && editing" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+        <div class="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-md flex flex-col gap-4 max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up">
+          <div class="flex justify-between items-center border-b border-white/5 pb-2 shrink-0">
+            <h3 class="font-extrabold text-sm text-white tracking-wide">🔧 配置 API 访问凭证</h3>
+            <button @click="showForm = false" class="text-[var(--text-muted)] hover:text-white text-sm">✕</button>
+          </div>
 
-        <div class="field">
-          <label>配置别名</label>
-          <input v-model="editing.name" class="input" placeholder="例如：我的 DeepSeek 接口" />
-        </div>
+          <div class="field">
+            <label>配置别名</label>
+            <input v-model="editing.name" class="input" placeholder="例如：我的 DeepSeek 接口" />
+          </div>
 
-        <div class="field">
-          <label>提供商服务</label>
-          <select v-model="editing.provider" @change="onProviderChange" class="input cursor-pointer bg-zinc-950">
-            <option value="deepseek" class="bg-zinc-950">DeepSeek</option>
-            <option value="gemini" class="bg-zinc-950">Google Gemini</option>
-            <option value="openai-compat" class="bg-zinc-950">OpenAI 兼容</option>
-            <option value="local" class="bg-zinc-950">本地 (Ollama / LocalAI)</option>
-          </select>
-        </div>
+          <div class="field">
+            <label>提供商服务</label>
+            <select v-model="editing.provider" @change="onProviderChange" class="input cursor-pointer bg-zinc-950">
+              <option value="deepseek" class="bg-zinc-950">DeepSeek</option>
+              <option value="gemini" class="bg-zinc-950">Google Gemini</option>
+              <option value="openai-compat" class="bg-zinc-950">OpenAI 兼容</option>
+              <option value="local" class="bg-zinc-950">本地 (Ollama / LocalAI)</option>
+            </select>
+          </div>
 
-        <div class="field">
-          <label>接口密钥 (API Key)</label>
-          <input v-model="editing.apiKey" type="password" class="input font-mono" placeholder="sk-..." />
-        </div>
+          <div class="field">
+            <label>接口密钥 (API Key)</label>
+            <input v-model="editing.apiKey" type="password" class="input font-mono" placeholder="sk-..." />
+          </div>
 
-        <div class="field">
-          <label>默认调用模型 (Model)</label>
-          <input v-model="editing.model" class="input font-mono text-xs" placeholder="模型名称" />
-        </div>
+          <div class="field">
+            <label>默认调用模型 (Model)</label>
+            <input v-model="editing.model" class="input font-mono text-xs" placeholder="模型名称" />
+          </div>
 
-        <div v-if="editing.provider !== 'deepseek' && editing.provider !== 'gemini'" class="field">
-          <label>接口基址 (Base URL)</label>
-          <input v-model="editing.baseUrl" class="input font-mono text-xs" placeholder="https://api.domain.com/v1" />
-        </div>
+          <div v-if="editing.provider !== 'deepseek' && editing.provider !== 'gemini'" class="field">
+            <label>接口基址 (Base URL)</label>
+            <input v-model="editing.baseUrl" class="input font-mono text-xs" placeholder="https://api.domain.com/v1" />
+          </div>
 
-        <div class="flex gap-2.5 justify-end mt-4 border-t border-white/5 pt-3">
-          <button @click="showForm = false" class="btn-sm px-4.5 py-2 text-xs font-bold rounded-xl">取消</button>
-          <button @click="saveProfile" class="btn-primary px-5 py-2.5 text-xs font-extrabold rounded-xl shadow-lg shadow-purple-500/15">保存凭证</button>
+          <div class="flex gap-2.5 justify-end mt-4 border-t border-white/5 pt-3 shrink-0">
+            <button @click="showForm = false" class="btn-sm px-4.5 py-2 text-xs font-bold rounded-xl">取消</button>
+            <button @click="saveProfile" class="btn-primary px-5 py-2.5 text-xs font-extrabold rounded-xl shadow-lg shadow-purple-500/15">保存凭证</button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
