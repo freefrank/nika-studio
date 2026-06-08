@@ -1532,16 +1532,17 @@ const progressPct = computed(() =>
 </script>
 
 <template>
-  <div :class="standalone ? 'min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-10' : 'flex flex-col h-full pb-10'">
+  <div :class="standalone ? 'min-h-screen lg:h-screen lg:overflow-hidden bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-6' : 'flex flex-col h-full lg:overflow-hidden pb-6'">
     <!-- Header -->
     <header v-if="standalone" class="flex items-center gap-3 px-5 py-3.5 bg-[var(--bg-2)]/85 backdrop-blur-md border-b border-white/5 sticky top-0 z-20 shadow-md">
       <button @click="router.push('/')" class="btn-back-arrow">←</button>
       <span class="font-extrabold text-sm md:text-base tracking-wide text-gradient-primary flex-1">📚 小说转世界书 (Novel to Lorebook)</span>
     </header>
 
-    <div class="flex-1 max-w-7xl mx-auto w-full p-5 flex flex-col lg:flex-row gap-6 items-start animate-fade-in">
-      <!-- Left Column: Inputs & Controls (Sticky on Desktop) -->
-      <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-4 lg:sticky lg:top-20">
+    <div class="flex-1 max-w-7xl mx-auto w-full p-5 flex flex-col lg:flex-row gap-6 items-stretch lg:overflow-hidden animate-fade-in"
+      :class="standalone ? 'lg:h-[calc(100vh-100px)]' : 'lg:h-[calc(100vh-220px)]'">
+      <!-- Left Column: Inputs & Controls (Scrollable on Desktop) -->
+      <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-2 scroll-thin">
         
         <!-- Resume Progress Banner -->
         <div v-if="hasSavedState" class="glass-card rounded-2xl p-4 border border-purple-500/20 bg-purple-500/5 flex flex-col gap-2.5 shadow-md animate-fade-in">
@@ -1662,8 +1663,8 @@ const progressPct = computed(() =>
 
       </div>
 
-      <!-- Right Column: Live Output & Results -->
-      <div class="flex-1 w-full min-w-0 flex flex-col gap-5">
+      <!-- Right Column: Live Output & Results (Scrollable on Desktop) -->
+      <div class="flex-1 w-full min-w-0 flex flex-col gap-5 lg:h-full lg:overflow-y-auto lg:pr-2 scroll-thin">
         
         <!-- Action Button -->
         <div class="flex gap-2.5 shrink-0">

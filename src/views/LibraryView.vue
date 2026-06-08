@@ -73,7 +73,7 @@ async function importCharacter(e: Event) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-10">
+  <div class="min-h-screen lg:h-screen lg:overflow-hidden bg-[var(--bg)] text-[var(--text)] flex flex-col animate-slide-up pb-6">
     <!-- Header -->
     <header class="sticky top-0 z-30 w-full glass-panel border-b border-white/5 px-6 py-4 flex items-center justify-between shadow-lg shadow-black/10">
       <div class="flex items-center gap-3">
@@ -105,7 +105,7 @@ async function importCharacter(e: Event) {
 
     <!-- ══ Characters Tab ══ -->
     <template v-if="activeTab === 'characters'">
-      <div class="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6 flex-1">
+      <div class="px-6 max-w-7xl mx-auto w-full flex flex-col gap-6 flex-1 lg:overflow-y-auto lg:pr-1 scroll-thin">
         <!-- Controls -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <!-- Action buttons -->
