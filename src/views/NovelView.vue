@@ -1183,16 +1183,26 @@ const progressPct = computed(() =>
             <span>{{ showChaptersList ? '▲ 收起' : '▼ 展开' }}</span>
           </button>
           
-          <div v-if="showChaptersList" class="p-4 flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1 scroll-thin">
+          <div v-if="showChaptersList" class="p-4 flex flex-wrap gap-2 max-h-56 overflow-y-auto pr-1 scroll-thin">
             <div v-for="(c, idx) in chapters" :key="c.title + '-' + idx" 
-              class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-zinc-950/40 border border-white/5 hover:bg-zinc-900/10 transition-colors">
-              <span class="truncate font-bold text-zinc-200 pr-2" :class="{'text-emerald-400': c.processed, 'text-rose-400': c.failed}">{{ c.title }}</span>
-              <span class="flex items-center gap-1.5 shrink-0 select-none">
-                <span v-if="c.processed" class="text-[9px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">✔️ 已完成</span>
-                <span v-else-if="c.failed" class="text-[9px] font-extrabold bg-rose-500/15 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-md cursor-help" :title="c.error">❌ 失败</span>
-                <span v-else-if="processing && progress.current === idx + 1" class="text-[9px] font-extrabold bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-md animate-pulse">⚡ 处理中</span>
-                <span v-else class="text-[9px] font-extrabold bg-zinc-800/30 text-zinc-500 border border-zinc-800/40 px-2 py-0.5 rounded-md">⏳ 等待中</span>
+              class="flex items-center gap-1.5 text-[11px] py-1 px-2.5 rounded-full border transition-all cursor-default select-none"
+              :class="[
+                c.processed ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/15' : 
+                c.failed ? 'bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/15 cursor-help' : 
+                (processing && progress.current === idx + 1) ? 'bg-purple-500/15 border-purple-500/40 text-purple-300 animate-pulse' : 
+                'bg-zinc-950/30 border-white/5 text-zinc-400 hover:border-white/10 hover:text-zinc-300'
+              ]"
+              :title="c.failed ? c.error : `${c.title} (${c.content.length.toLocaleString()}字)`">
+              
+              <span class="text-[9px] leading-none">
+                <span v-if="c.processed">✔️</span>
+                <span v-else-if="c.failed">❌</span>
+                <span v-else-if="processing && progress.current === idx + 1" class="inline-block animate-pulse">⚡</span>
+                <span v-else>⏳</span>
               </span>
+
+              <span class="font-bold truncate max-w-[90px]">{{ c.title }}</span>
+              <span class="text-[9px] opacity-75 font-mono">({{ c.content.length.toLocaleString() }}字)</span>
             </div>
           </div>
         </div>
