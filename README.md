@@ -1,6 +1,6 @@
 # 妮卡角色工作室 Pro — 重构版
 
-Vue 3 重写版本的 [Nika Character Studio](../Nika-Character-Studio-main)，从 4.4 万行无模块化原生 JS 重构为现代前端架构。
+Vue 3 重写版本的 [Nika Character Studio](github.com/HiUnikitty/Nika-Character-Studio)，从 4.4 万行无模块化原生 JS 重构为现代前端架构。
 
 ## 技术栈
 
