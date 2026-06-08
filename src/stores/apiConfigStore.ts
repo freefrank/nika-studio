@@ -2,17 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { cloneForStorage, openDB, tx } from '@/services/db'
 import { settingsService } from '@/services/settingsService'
-
-export interface ApiProfile {
-  id: string
-  name: string
-  provider: 'deepseek' | 'gemini' | 'openai-compat' | 'local'
-  apiKey: string
-  baseUrl?: string
-  model: string
-  useProxy?: boolean
-  updatedAt: number
-}
+import type { ApiProfile } from '@/types'
 
 const DB = 'NikaApiConfigDB'
 const STORE = 'profiles'
@@ -47,20 +37,34 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
 
   const active = () => profiles.value.find(p => p.id === activeId.value) ?? profiles.value[0] ?? null
 
+  async function syncUp() {
+    const allProfiles = await profileService.getAll()
+    settingsService.update({
+      activeProfileId: activeId.value,
+      apiProfiles: allProfiles
+    })
+  }
+
   async function load() {
     profiles.value = await profileService.getAll()
+    activeId.value = localStorage.getItem('nika_active_profile')
     if (activeId.value) {
       const profile = profiles.value.find(p => p.id === activeId.value)
       if (profile) {
-        settingsService.update({
-          apiConfig: {
-            provider: profile.provider,
-            apiKey: profile.apiKey,
-            baseUrl: profile.baseUrl,
-            model: profile.model,
-            useProxy: profile.useProxy ?? false
-          }
-        })
+        const currentSettings = settingsService.get()
+        if (!currentSettings.activeProfileId || !currentSettings.apiProfiles) {
+          settingsService.update({
+            activeProfileId: activeId.value,
+            apiProfiles: profiles.value,
+            apiConfig: {
+              provider: profile.provider,
+              apiKey: profile.apiKey,
+              baseUrl: profile.baseUrl,
+              model: profile.model,
+              useProxy: profile.useProxy ?? false
+            }
+          })
+        }
       }
     }
   }
@@ -70,24 +74,33 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     const idx = profiles.value.findIndex(x => x.id === saved.id)
     if (idx >= 0) profiles.value[idx] = saved
     else profiles.value.push(saved)
-    if (activeId.value === saved.id) {
-      setActive(saved.id)
+    if (activeId.value === saved.id || !activeId.value) {
+      await setActive(saved.id)
+    } else {
+      await syncUp()
     }
   }
 
   async function remove(id: string) {
     await profileService.delete(id)
     profiles.value = profiles.value.filter(p => p.id !== id)
-    if (activeId.value === id) setActive(profiles.value[0]?.id ?? null)
+    if (activeId.value === id) {
+      await setActive(profiles.value[0]?.id ?? null)
+    } else {
+      await syncUp()
+    }
   }
 
-  function setActive(id: string | null) {
+  async function setActive(id: string | null) {
     activeId.value = id
     if (id) {
       localStorage.setItem('nika_active_profile', id)
       const profile = profiles.value.find(p => p.id === id)
       if (profile) {
+        const allProfiles = await profileService.getAll()
         settingsService.update({
+          activeProfileId: id,
+          apiProfiles: allProfiles,
           apiConfig: {
             provider: profile.provider,
             apiKey: profile.apiKey,
@@ -99,8 +112,46 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
       }
     } else {
       localStorage.removeItem('nika_active_profile')
+      const allProfiles = await profileService.getAll()
+      settingsService.update({
+        activeProfileId: null,
+        apiProfiles: allProfiles
+      })
     }
   }
 
-  return { profiles, activeId, active, load, save, remove, setActive }
+  async function syncWithServer(serverProfiles: ApiProfile[]) {
+    const local = await profileService.getAll()
+    const mergedMap = new Map<string, ApiProfile>()
+    
+    // Add server profiles
+    for (const p of serverProfiles) {
+      mergedMap.set(p.id, p)
+    }
+    
+    // Merge with local profiles based on updatedAt
+    for (const p of local) {
+      const existing = mergedMap.get(p.id)
+      if (!existing || p.updatedAt > existing.updatedAt) {
+        mergedMap.set(p.id, p)
+      }
+    }
+    
+    const merged = Array.from(mergedMap.values())
+    
+    // Write back to IndexedDB
+    for (const p of merged) {
+      await profileService.save(p)
+    }
+    
+    profiles.value = merged
+    
+    // Check if active ID is valid
+    const activeExists = activeId.value && profiles.value.some(p => p.id === activeId.value)
+    if (!activeExists && profiles.value.length > 0) {
+      await setActive(profiles.value[0].id)
+    }
+  }
+
+  return { profiles, activeId, active, load, save, remove, setActive, syncWithServer }
 })

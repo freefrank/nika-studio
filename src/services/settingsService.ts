@@ -23,11 +23,20 @@ export const settingsService = {
     localStorage.setItem(KEY, JSON.stringify(settings))
     const username = localStorage.getItem('nika_username')
     if (username) {
+      console.log('[Settings Sync] Uploading settings and profiles to server for user:', username)
       fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, settings })
-      }).catch(err => console.warn('Failed to sync settings to server:', err))
+      })
+      .then(res => {
+        if (res.ok) {
+          console.log('[Settings Sync] Successfully synced settings and profiles to server.')
+        } else {
+          console.warn('[Settings Sync] Server returned error status on upload:', res.status)
+        }
+      })
+      .catch(err => console.warn('[Settings Sync] Failed to sync settings to server:', err))
     }
   },
 

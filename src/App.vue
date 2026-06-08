@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import pkg from '../package.json'
+import { useApiConfigStore } from '@/stores/apiConfigStore'
 
 const isLoggedIn = ref(false)
 const currentUsername = ref('')
@@ -10,16 +11,38 @@ const errorMsg = ref('')
 const loading = ref(false)
 
 const syncSettings = async (user: string) => {
+  console.log(`[Settings Sync] Fetching settings from server for user: ${user}`)
   try {
-    const res = await fetch(`/api/settings?username=${encodeURIComponent(user)}`)
+    // Add cache buster query parameter to bypass potential reverse-proxy/browser cache
+    const res = await fetch(`/api/settings?username=${encodeURIComponent(user)}&_t=${Date.now()}`)
     if (res.ok) {
       const data = await res.json()
       if (data.settings) {
+        console.log('[Settings Sync] Settings downloaded successfully:', data.settings)
         localStorage.setItem('nika_settings', JSON.stringify(data.settings))
+        
+        if (data.settings.activeProfileId !== undefined) {
+          if (data.settings.activeProfileId) {
+            localStorage.setItem('nika_active_profile', data.settings.activeProfileId)
+          } else {
+            localStorage.removeItem('nika_active_profile')
+          }
+        }
+        
+        if (data.settings.apiProfiles) {
+          console.log('[Settings Sync] Synchronizing API profiles to IndexedDB...')
+          const apiConfigStore = useApiConfigStore()
+          await apiConfigStore.syncWithServer(data.settings.apiProfiles)
+        }
+        console.log('[Settings Sync] Local synchronization finished.')
+      } else {
+        console.log('[Settings Sync] No settings returned by server.')
       }
+    } else {
+      console.warn(`[Settings Sync] Server returned non-ok status: ${res.status}`)
     }
   } catch (e) {
-    console.warn('Failed to sync settings from server:', e)
+    console.warn('[Settings Sync] Error fetching settings:', e)
   }
 }
 
@@ -51,18 +74,35 @@ const handleLogin = async () => {
       if (data.settings) {
         // Server has settings: sync down
         localStorage.setItem('nika_settings', JSON.stringify(data.settings))
+        if (data.settings.activeProfileId !== undefined) {
+          if (data.settings.activeProfileId) {
+            localStorage.setItem('nika_active_profile', data.settings.activeProfileId)
+          } else {
+            localStorage.removeItem('nika_active_profile')
+          }
+        }
+        if (data.settings.apiProfiles) {
+          const apiConfigStore = useApiConfigStore()
+          await apiConfigStore.syncWithServer(data.settings.apiProfiles)
+        }
       } else if (localSettingsRaw) {
         // Server has no settings, but client has local settings: sync up (migrate to server)
         try {
           const parsed = JSON.parse(localSettingsRaw)
+          // Include local IndexedDB profiles & active profile ID in migration
+          const apiConfigStore = useApiConfigStore()
+          await apiConfigStore.load()
+          parsed.apiProfiles = apiConfigStore.profiles
+          parsed.activeProfileId = apiConfigStore.activeId
+          
           await fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: username.value.trim(), settings: parsed })
           })
-          console.log('Successfully migrated existing local settings to server.')
+          console.log('[Settings Sync] Successfully migrated local settings and profiles to server.')
         } catch (e) {
-          console.warn('Failed to upload existing settings to server:', e)
+          console.warn('[Settings Sync] Failed to upload existing settings during login migration:', e)
         }
       }
       
@@ -84,6 +124,7 @@ const logout = () => {
   window.location.reload()
 }
 </script>
+
 
 <template>
   <div v-if="!isLoggedIn" class="fixed inset-0 z-50 flex items-center justify-center bg-[#09090b] overflow-hidden font-sans select-none">

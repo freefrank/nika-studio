@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useApiConfigStore, type ApiProfile } from '@/stores/apiConfigStore'
+import { useApiConfigStore } from '@/stores/apiConfigStore'
 import { testConnection } from '@/services/apiService'
+import type { ApiProfile } from '@/types'
 
 const store = useApiConfigStore()
 const editing = ref<ApiProfile | null>(null)

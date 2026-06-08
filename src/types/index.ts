@@ -88,9 +88,18 @@ export interface ApiConfig {
   useProxy?: boolean
 }
 
+export interface ApiProfile extends ApiConfig {
+  id: string
+  name: string
+  updatedAt: number
+}
+
 export interface AppSettings {
   apiConfig: ApiConfig
   language: 'zh' | 'en'
   debug: boolean
   limitlessPrompt: string
+  activeProfileId?: string | null
+  apiProfiles?: ApiProfile[]
 }
+
