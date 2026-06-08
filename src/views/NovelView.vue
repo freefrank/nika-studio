@@ -462,7 +462,19 @@ function mergeWorldbookDataIncremental(target: any, source: any) {
         }
 
         if (sourceEntry['内容']) {
-          targetEntry['内容'] = sourceEntry['内容'];
+          const targetVal = (targetEntry['内容'] || '').trim();
+          const sourceVal = (sourceEntry['内容'] || '').trim();
+          if (targetVal !== sourceVal) {
+            if (targetVal.includes(sourceVal)) {
+              // Existing target content is more complete, keep it
+            } else if (sourceVal.includes(targetVal)) {
+              // Newly extracted content is more complete, use it
+              targetEntry['内容'] = sourceVal;
+            } else {
+              // They are complementary, append the new information
+              targetEntry['内容'] = targetVal + '\n\n' + sourceVal;
+            }
+          }
         }
       } else {
         target[category][entryName] = sourceEntry;
@@ -479,7 +491,21 @@ function mergeWorldbookData(target: any, source: any) {
       if (!target[key]) target[key] = {};
       mergeWorldbookData(target[key], source[key]);
     } else {
-      target[key] = source[key];
+      if (key === '内容' && typeof target[key] === 'string' && typeof source[key] === 'string') {
+        const targetVal = target[key].trim();
+        const sourceVal = source[key].trim();
+        if (targetVal !== sourceVal) {
+          if (targetVal.includes(sourceVal)) {
+            // Keep target
+          } else if (sourceVal.includes(targetVal)) {
+            target[key] = sourceVal;
+          } else {
+            target[key] = targetVal + '\n\n' + sourceVal;
+          }
+        }
+      } else {
+        target[key] = source[key];
+      }
     }
   }
 }
@@ -1115,22 +1141,79 @@ function exportWorldbook() {
 }
 
 async function saveToLibrary() {
-  const char: Character = {
-    id: crypto.randomUUID(), name: worldbook.value.name || '新角色',
-    avatar: undefined, tags: ['世界书'], isFavorite: false,
-    createdAt: Date.now(), updatedAt: Date.now(),
-    cardData: {
-      spec: 'chara_card_v2', spec_version: '2.0',
-      data: {
-        name: worldbook.value.name, description: '', personality: '',
-        scenario: '', first_mes: '', mes_example: '',
-        creator_notes: '', system_prompt: '', post_history_instructions: '',
-        tags: [], creator: '', character_version: '',
-        character_book: worldbook.value,
+  await charStore.load()
+  const targetName = worldbook.value.name || '新角色'
+  
+  // Find if there is an existing character card with the same name and "世界书" tag, or just same name
+  const existing = charStore.characters.find(
+    c => c.name === targetName && c.tags.includes('世界书')
+  ) || charStore.characters.find(
+    c => c.name === targetName
+  )
+
+  if (existing) {
+    // Merge new worldbook into the existing one
+    const existingBook = existing.cardData.data.character_book || { name: existing.name, entries: [] }
+    
+    // Create a map of existing entries by id or comment
+    const entryMap = new Map<string, WorldBookEntry>()
+    existingBook.entries.forEach(e => {
+      const key = e.id || e.comment
+      entryMap.set(key, e)
+    })
+    
+    // Merge new entries
+    worldbook.value.entries.forEach(newEntry => {
+      const key = newEntry.id || newEntry.comment
+      const existingEntry = entryMap.get(key)
+      
+      if (existingEntry) {
+        // Merge keys
+        existingEntry.keys = [...new Set([...existingEntry.keys, ...newEntry.keys])]
+        // Smart merge content
+        const existingContent = (existingEntry.content || '').trim()
+        const newContent = (newEntry.content || '').trim()
+        if (existingContent !== newContent) {
+          if (existingContent.includes(newContent)) {
+            // Keep existing
+          } else if (newContent.includes(existingContent)) {
+            existingEntry.content = newContent
+          } else {
+            existingEntry.content = existingContent + '\n\n' + newContent
+          }
+        }
+      } else {
+        // Add new entry
+        existingBook.entries.push(newEntry)
+      }
+    })
+    
+    // Update the existing character
+    existing.cardData.data.character_book = existingBook
+    existing.updatedAt = Date.now()
+    
+    await charStore.save(existing)
+    console.log('[Novel Extractor] Merged and updated existing character card in library.')
+  } else {
+    // Create new character card
+    const char: Character = {
+      id: crypto.randomUUID(), name: targetName,
+      avatar: undefined, tags: ['世界书'], isFavorite: false,
+      createdAt: Date.now(), updatedAt: Date.now(),
+      cardData: {
+        spec: 'chara_card_v2', spec_version: '2.0',
+        data: {
+          name: targetName, description: '', personality: '',
+          scenario: '', first_mes: '', mes_example: '',
+          creator_notes: '', system_prompt: '', post_history_instructions: '',
+          tags: [], creator: '', character_version: '',
+          character_book: worldbook.value,
+        }
       }
     }
+    await charStore.save(char)
+    console.log('[Novel Extractor] Created new character card in library.')
   }
-  await charStore.save(char)
   router.push('/')
 }
 
