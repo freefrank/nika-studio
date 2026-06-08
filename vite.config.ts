@@ -42,6 +42,11 @@ function stateServerPlugin() {
         }
 
         if (pathname.startsWith('/proxy/')) {
+          if (!process.env.ENABLE_DEV_PROXY) {
+            res.writeHead(404, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Proxy disabled' }))
+            return
+          }
           const match = pathname.match(/^\/proxy\/(https?)\/([^/]+)(.*)$/)
           if (match) {
             const protocol = match[1]
@@ -207,10 +212,18 @@ function stateServerPlugin() {
             return
           }
 
-          const userStateFilePath = path.join(
-            path.dirname(fileURLToPath(import.meta.url)),
-            `novel-state-${username}.json`
-          )
+          if (!/^[a-zA-Z0-9_-]{1,64}$/.test(username as string)) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Invalid username' }))
+            return
+          }
+          const dataDir = path.dirname(fileURLToPath(import.meta.url))
+          const userStateFilePath = path.resolve(dataDir, `novel-state-${username}.json`)
+          if (!userStateFilePath.startsWith(dataDir + path.sep)) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Invalid path' }))
+            return
+          }
 
           if (req.method === 'POST') {
             let body = ''

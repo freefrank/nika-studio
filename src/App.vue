@@ -22,7 +22,7 @@ const syncSettings = async (user: string) => {
     if (res.ok) {
       const data = await res.json()
       if (data.settings) {
-        console.log('[Settings Sync] Settings downloaded successfully:', data.settings)
+        console.log('[Settings Sync] Settings downloaded successfully')
         localStorage.setItem('nika_settings', JSON.stringify(data.settings))
         
         if (data.settings.activeProfileId !== undefined) {

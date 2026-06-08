@@ -165,11 +165,11 @@ async function testConfig() {
             <input v-model="editing.baseUrl" class="input font-mono text-xs" placeholder="https://api.domain.com/v1" />
           </div>
 
-          <!-- Local proxy switch -->
-          <div class="flex items-center gap-2 mt-2 select-none">
+          <!-- Local proxy switch (disabled: requires ENABLE_DEV_PROXY on server) -->
+          <!-- <div class="flex items-center gap-2 mt-2 select-none">
             <input type="checkbox" id="use-local-proxy" v-model="editing.useProxy" class="accent-purple-500 w-4.5 h-4.5 rounded cursor-pointer" />
             <label for="use-local-proxy" class="text-xs text-zinc-300 font-semibold cursor-pointer">使用本地开发代理 (解决 CORS 跨源限制)</label>
-          </div>
+          </div> -->
 
           <!-- Connection Test Result -->
           <div v-if="testResult" class="mt-2 text-xs p-3 rounded-xl border flex flex-col gap-1.5 animate-fade-in"

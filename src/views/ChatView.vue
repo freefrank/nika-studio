@@ -244,11 +244,11 @@ function saveSettings() { settingsService.save(settings.value); showSettings.val
         <label class="text-[10px] text-zinc-500 font-bold uppercase">接口基址 (Base URL)</label>
         <input v-model="settings.apiConfig.baseUrl" class="input" placeholder="Base URL" />
       </div>
-      <!-- Local proxy switch -->
-      <div class="flex items-center gap-2 mt-1 select-none">
+      <!-- Local proxy switch (disabled: requires ENABLE_DEV_PROXY on server) -->
+      <!-- <div class="flex items-center gap-2 mt-1 select-none">
         <input type="checkbox" id="chat-use-local-proxy" v-model="settings.apiConfig.useProxy" class="accent-purple-500 w-4 h-4 rounded cursor-pointer" />
         <label for="chat-use-local-proxy" class="text-xs text-zinc-300 font-semibold cursor-pointer">使用本地开发代理 (解决 CORS 跨源限制)</label>
-      </div>
+      </div> -->
       <div class="flex justify-end gap-2 border-t border-white/5 pt-3">
         <button @click="openGlobalSettings" class="btn-sm text-xs py-1.5 px-3.5 font-semibold">更多高级设置</button>
         <button @click="saveSettings" class="btn-primary-sm py-1.5 px-4 font-bold text-xs rounded-xl shadow-md shadow-purple-500/15">确认保存</button>

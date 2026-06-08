@@ -7,6 +7,7 @@ import { useCharacterStore } from '@/stores/characterStore'
 import type { Character, WorldBook, WorldBookEntry } from '@/types'
 import { openDB, tx, cloneForStorage } from '@/services/db'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const props = withDefaults(defineProps<{ standalone?: boolean }>(), { standalone: true })
 
@@ -59,7 +60,7 @@ function isContentLong(content: string) {
 
 function renderMarkdown(content: string) {
   try {
-    return marked.parse(content)
+    return DOMPurify.sanitize(marked.parse(content) as string)
   } catch (e) {
     console.error('Failed to parse markdown:', e)
     return content
