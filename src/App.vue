@@ -46,9 +46,26 @@ const handleLogin = async () => {
     if (res.ok && data.success) {
       localStorage.setItem('nika_username', username.value.trim())
       currentUsername.value = username.value.trim()
+      
+      const localSettingsRaw = localStorage.getItem('nika_settings')
       if (data.settings) {
+        // Server has settings: sync down
         localStorage.setItem('nika_settings', JSON.stringify(data.settings))
+      } else if (localSettingsRaw) {
+        // Server has no settings, but client has local settings: sync up (migrate to server)
+        try {
+          const parsed = JSON.parse(localSettingsRaw)
+          await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username.value.trim(), settings: parsed })
+          })
+          console.log('Successfully migrated existing local settings to server.')
+        } catch (e) {
+          console.warn('Failed to upload existing settings to server:', e)
+        }
       }
+      
       isLoggedIn.value = true
       // Reload page to re-initialize store values with new credentials
       window.location.reload()
