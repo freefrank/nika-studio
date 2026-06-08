@@ -37,10 +37,20 @@ const STATE_DB = 'NikaNovelStateDB'
 const STATE_STORE = 'novel_state'
 const showChaptersList = ref(true)
 
-const expandedEntries = ref<Record<string, boolean>>({})
+const expandedEntries = ref<Set<string>>(new Set())
 
 function toggleEntry(id: string) {
-  expandedEntries.value[id] = !expandedEntries.value[id]
+  if (expandedEntries.value.has(id)) {
+    expandedEntries.value.delete(id)
+  } else {
+    expandedEntries.value.add(id)
+  }
+  // Force Vue to detect the change by creating a new Set
+  expandedEntries.value = new Set(expandedEntries.value)
+}
+
+function isExpanded(id: string) {
+  return expandedEntries.value.has(id)
 }
 
 function isContentLong(content: string) {
@@ -1351,8 +1361,8 @@ const progressPct = computed(() =>
               </div>
               
               <div 
-                class="markdown-body text-zinc-300 mt-2 border-t border-white/5 pt-2 select-text font-medium transition-all duration-300 overflow-hidden"
-                :class="expandedEntries[entry.id] ? 'pb-6' : (isContentLong(entry.content) ? 'max-h-[72px] mask-gradient pb-6' : 'pb-2')"
+                class="markdown-body text-zinc-300 mt-2 border-t border-white/5 pt-2 select-text font-medium"
+                :class="isExpanded(entry.id) ? 'pb-6' : (isContentLong(entry.content) ? 'max-h-[72px] overflow-hidden mask-gradient pb-6' : 'pb-2')"
                 v-html="renderMarkdown(entry.content)"
               />
 
@@ -1362,7 +1372,7 @@ const progressPct = computed(() =>
                 @click="toggleEntry(entry.id)" 
                 class="absolute bottom-2.5 right-3 text-[10px] text-purple-400 hover:text-purple-300 font-bold bg-zinc-950/90 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.5)] z-10 transition-all active:scale-95 cursor-pointer select-none"
               >
-                {{ expandedEntries[entry.id] ? '▲ 收起' : '▼ 展开' }}
+                {{ isExpanded(entry.id) ? '▲ 收起' : '▼ 展开' }}
               </button>
             </div>
           </div>
