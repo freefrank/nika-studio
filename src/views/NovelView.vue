@@ -15,7 +15,7 @@ const fileContent = ref('')
 const fileName = ref('')
 const encoding = ref('auto')
 const fileInputEl = ref<HTMLInputElement | null>(null)
-const chapterRegex = ref('第[零一二三四五六七八九十百千\\d]+章')
+const chapterRegex = ref('第[零一二三四五六七八九十百千\\d]+[章节回幕]')
 const chapters = ref<{ title: string; content: string }[]>([])
 const worldbook = ref<WorldBook>({ name: '', entries: [] })
 const processing = ref(false)
@@ -353,7 +353,7 @@ const progressPct = computed(() =>
       <div v-if="chapters.length" class="glass-card rounded-2xl p-5 border border-white/5 shadow-sm animate-fade-in">
         <h4 class="text-[10px] font-bold text-zinc-400 mb-3 uppercase tracking-wider">自动识别到 {{ chapters.length }} 个章节</h4>
         <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
-          <span v-for="c in chapters.slice(0, 20)" :key="c.title" class="text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2.5 py-1 rounded-lg">{{ c.title }}</span>
+          <span v-for="(c, idx) in chapters.slice(0, 20)" :key="c.title + '-' + idx" class="text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/10 px-2.5 py-1 rounded-lg">{{ c.title }}</span>
           <span v-if="chapters.length > 20" class="text-xs text-[var(--text-muted)] flex items-center pl-1 font-bold">...等其余 {{ chapters.length - 20 }} 个章节</span>
         </div>
       </div>
