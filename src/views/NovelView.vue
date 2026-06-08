@@ -44,7 +44,7 @@ function toggleEntry(id: string) {
 }
 
 function isContentLong(content: string) {
-  return content.length > 120 || content.includes('\n')
+  return content.length > 80 || content.includes('\n')
 }
 
 function renderMarkdown(content: string) {
@@ -1352,18 +1352,18 @@ const progressPct = computed(() =>
               
               <div 
                 class="markdown-body text-zinc-300 mt-2 border-t border-white/5 pt-2 select-text font-medium transition-all duration-300 overflow-hidden"
-                :class="expandedEntries[entry.id] ? 'pb-2' : 'max-h-[72px] mask-gradient pb-2'"
+                :class="expandedEntries[entry.id] ? 'pb-6' : (isContentLong(entry.content) ? 'max-h-[72px] mask-gradient pb-6' : 'pb-2')"
                 v-html="renderMarkdown(entry.content)"
               />
 
-              <div v-if="isContentLong(entry.content)" class="flex justify-end mt-1">
-                <button 
-                  @click="toggleEntry(entry.id)" 
-                  class="text-[10px] text-purple-400 hover:text-purple-300 font-bold flex items-center gap-0.5 transition-colors cursor-pointer select-none"
-                >
-                  <span>{{ expandedEntries[entry.id] ? '▲ 收起' : '▼ 展开' }}</span>
-                </button>
-              </div>
+              <!-- Floating Toggle Button -->
+              <button 
+                v-if="isContentLong(entry.content)"
+                @click="toggleEntry(entry.id)" 
+                class="absolute bottom-2.5 right-3 text-[10px] text-purple-400 hover:text-purple-300 font-bold bg-zinc-950/90 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.5)] z-10 transition-all active:scale-95 cursor-pointer select-none"
+              >
+                {{ expandedEntries[entry.id] ? '▲ 收起' : '▼ 展开' }}
+              </button>
             </div>
           </div>
         </div>
