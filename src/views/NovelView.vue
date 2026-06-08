@@ -492,7 +492,7 @@ function convertGeneratedWorldbookToStandard(generatedWb: any): WorldBookEntry[]
 
         if (typeof itemData === 'object' && itemData !== null && itemData.关键词 && itemData.内容) {
           standardWorldbook.push({
-            id: crypto.randomUUID(),
+            id: `${category}_${itemName}`,
             keys: Array.isArray(itemData.关键词) ? itemData.关键词 : [itemName],
             secondary_keys: [],
             comment: `[${category}] ${itemName}`,
@@ -506,7 +506,7 @@ function convertGeneratedWorldbookToStandard(generatedWb: any): WorldBookEntry[]
           })
         } else if (typeof itemData === 'string') {
           standardWorldbook.push({
-            id: crypto.randomUUID(),
+            id: `${category}_${itemName}`,
             keys: [itemName],
             secondary_keys: [],
             comment: `[${category}] ${itemName}`,
