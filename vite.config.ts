@@ -27,8 +27,19 @@ function stateServerPlugin() {
     name: 'state-server-plugin',
     configureServer(server: any) {
       server.middlewares.use(async (req: any, res: any, next: any) => {
-        const url = new URL(req.url, 'http://localhost')
+               const url = new URL(req.url, 'http://localhost')
         const pathname = url.pathname
+
+        if (pathname.startsWith('/api')) {
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-User, x-user')
+          if (req.method === 'OPTIONS') {
+            res.writeHead(204)
+            res.end()
+            return
+          }
+        }
 
         if (pathname === '/api/auth/login' && req.method === 'POST') {
           let body = ''
