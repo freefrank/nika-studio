@@ -787,6 +787,7 @@ async function checkSavedState() {
   try {
     // Try server first
     let state = await getStateFromServer()
+    let loadedFromLocal = false
     
     // Fallback to IndexedDB
     if (!state) {
@@ -796,6 +797,9 @@ async function checkSavedState() {
         }
       })
       state = await tx(db, STATE_STORE, 'readonly', s => s.get('current_state'))
+      if (state) {
+        loadedFromLocal = true
+      }
     }
 
     if (state) {
@@ -807,6 +811,11 @@ async function checkSavedState() {
         fileName: state.fileName,
         progress: `${processed}/${total}`,
         percent: pct
+      }
+      
+      if (loadedFromLocal) {
+        console.log('Detected progress in local IndexedDB. Syncing to server...')
+        await saveStateToServer(state)
       }
     } else {
       hasSavedState.value = false
