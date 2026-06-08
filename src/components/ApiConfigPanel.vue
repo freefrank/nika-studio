@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useApiConfigStore, type ApiProfile } from '@/stores/apiConfigStore'
+import { chat } from '@/services/apiService'
 
 const store = useApiConfigStore()
 const editing = ref<ApiProfile | null>(null)
 const showForm = ref(false)
+const testLoading = ref(false)
+const testResult = ref<{ success: boolean; message: string } | null>(null)
 
 const PROVIDER_DEFAULTS: Record<string, { model: string; baseUrl?: string }> = {
   deepseek: { model: 'deepseek-chat' },
@@ -20,11 +23,15 @@ function newProfile() {
     id: crypto.randomUUID(), name: '新配置',
     provider: 'deepseek', apiKey: '', model: 'deepseek-chat', updatedAt: 0,
   }
+  testResult.value = null
+  testLoading.value = false
   showForm.value = true
 }
 
 function editProfile(p: ApiProfile) {
   editing.value = { ...p }
+  testResult.value = null
+  testLoading.value = false
   showForm.value = true
 }
 
@@ -52,6 +59,26 @@ async function deleteProfile(id: string) {
     await store.remove(id)
   } catch (e) {
     alert('删除失败: ' + (e as Error).message)
+  }
+}
+
+async function testConfig() {
+  if (!editing.value) return
+  testLoading.value = true
+  testResult.value = null
+  try {
+    const reply = await chat(editing.value, [{ role: 'user', content: '回复HI' }])
+    testResult.value = {
+      success: true,
+      message: reply || '(连接成功，无返回内容)'
+    }
+  } catch (e) {
+    testResult.value = {
+      success: false,
+      message: (e as Error).message || '连接失败'
+    }
+  } finally {
+    testLoading.value = false
   }
 }
 </script>
@@ -137,7 +164,21 @@ async function deleteProfile(id: string) {
             <input v-model="editing.baseUrl" class="input font-mono text-xs" placeholder="https://api.domain.com/v1" />
           </div>
 
+          <!-- Connection Test Result -->
+          <div v-if="testResult" class="mt-2 text-xs p-3 rounded-xl border flex flex-col gap-1.5 animate-fade-in"
+            :class="testResult.success ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'">
+            <div class="font-bold flex items-center gap-1.5">
+              <span>{{ testResult.success ? '✓' : '✗' }}</span>
+              <span>{{ testResult.success ? '连接成功 (Success)' : '连接失败 (Failed)' }}</span>
+            </div>
+            <div class="font-mono break-all leading-relaxed whitespace-pre-wrap text-[11px] bg-black/20 p-2 rounded-lg border border-white/5">{{ testResult.message }}</div>
+          </div>
+
           <div class="flex gap-2.5 justify-end mt-4 border-t border-white/5 pt-3 shrink-0">
+            <button @click="testConfig" :disabled="testLoading" class="btn-test mr-auto px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-50 select-none">
+              <span v-if="testLoading" class="inline-block w-3 h-3 border border-t-transparent rounded-full animate-spin border-purple-400"></span>
+              <span>⚡ 测试连接</span>
+            </button>
             <button @click="showForm = false" class="btn-sm px-4.5 py-2 text-xs font-bold rounded-xl">取消</button>
             <button @click="saveProfile" class="btn-primary px-5 py-2.5 text-xs font-extrabold rounded-xl shadow-lg shadow-purple-500/15">保存凭证</button>
           </div>
@@ -152,6 +193,7 @@ async function deleteProfile(id: string) {
 .input { @apply w-full bg-zinc-950/45 border border-white/5 text-[var(--text)] px-3.5 py-2.5 rounded-xl outline-none focus:border-[var(--primary)] transition-all focus:bg-zinc-950/80 focus:shadow-[0_0_15px_rgba(168,85,247,0.15)] text-xs md:text-sm; }
 .btn-primary { @apply bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white transition-all cursor-pointer; }
 .btn-sm { @apply bg-zinc-900 hover:bg-zinc-800 border border-white/5 text-[var(--text)] transition-all cursor-pointer font-bold; }
+.btn-test { @apply bg-zinc-950/40 hover:bg-zinc-800 border border-white/5 text-purple-400 hover:text-purple-300 transition-all cursor-pointer; }
 .field { @apply flex flex-col gap-1.5; }
 .field label { @apply text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider select-none; }
 </style>
