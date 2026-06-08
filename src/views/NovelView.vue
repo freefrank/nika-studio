@@ -23,6 +23,8 @@ const progress = ref({ current: 0, total: 0 })
 const abortCtrl = ref<AbortController | null>(null)
 const splitSize = ref(3000)
 const incrementalMode = ref(true) // 增量模式：只输出新增/变更条目
+const enablePlotOutline = ref(true)
+const enableLiteraryStyle = ref(false)
 const currentPrompt = ref('')
 const currentResponse = ref('')
 
@@ -30,15 +32,61 @@ const currentResponse = ref('')
 interface Category {
   name: string
   enabled: boolean
-  guide: string
+  entryExample: string
+  keywordsExample: string[]
+  contentGuide: string
 }
 
 const DEFAULT_CATEGORIES: Category[] = [
-  { name: '角色', enabled: true, guide: '角色描述，包含名字、性别、外貌、性格、背景' },
-  { name: '地点', enabled: true, guide: '地点描述，包含名称、位置、特征' },
-  { name: '组织', enabled: true, guide: '组织描述，包含名称、性质、成员、目标' },
-  { name: '道具', enabled: false, guide: '道具描述，包含名称、类型、功能' },
-  { name: '剧情大纲', enabled: false, guide: '章节剧情概要，主要事件、转折点' },
+  {
+    name: "角色",
+    enabled: true,
+    entryExample: "角色真实姓名",
+    keywordsExample: ["真实姓名", "称呼1", "称呼2", "绰号"],
+    contentGuide: "基于原文的角色描述，包含但不限于**名称**:（必须要）、**性别**:、**MBTI(必须要，如变化请说明背景)**:、**貌龄**:、**年龄**:、**身份**:、**背景**:、**性格**:、**外貌**:、**技能**:、**重要事件**:、**话语示例**:、**弱点**:、**背景故事**:等（实际嵌套或者排列方式按合理的逻辑）"
+  },
+  {
+    name: "地点",
+    enabled: true,
+    entryExample: "地点真实名称",
+    keywordsExample: ["地点名", "别称", "俗称"],
+    contentGuide: "基于原文的地点描述，包含但不限于**名称**:（必须要）、**位置**:、**特征**:、**重要事件**:等（实际嵌套或者排列方式按合理的逻辑）"
+  },
+  {
+    name: "组织",
+    enabled: true,
+    entryExample: "组织真实名称",
+    keywordsExample: ["组织名", "简称", "代号"],
+    contentGuide: "基于原文的组织描述，包含但不限于**名称**:（必须要）、**性质**:、**成员**:、**目标**:等（实际嵌套或者排列方式按合理的逻辑）"
+  },
+  {
+    name: "道具",
+    enabled: false,
+    entryExample: "道具名称",
+    keywordsExample: ["道具名", "别名"],
+    contentGuide: "基于原文的道具描述，包含但不限于**名称**:、**类型**:、**功能**:、**来源**:、**持有者**:等"
+  },
+  {
+    name: "玩法",
+    enabled: false,
+    entryExample: "玩法名称",
+    keywordsExample: ["玩法名", "规则名"],
+    contentGuide: "基于原文的玩法/规则描述，包含但不限于**名称**:、**规则说明**:、**参与条件**:、**奖惩机制**:等"
+  },
+  {
+    name: "章节剧情",
+    enabled: false,
+    entryExample: "第X章",
+    keywordsExample: ["章节名", "章节号"],
+    contentGuide: "该章节的剧情概要，包含但不限于**章节标题**:、**主要事件**:、**出场角色**:、**关键转折**:、**伏笔线索**:等"
+  },
+  {
+    name: "角色内心",
+    enabled: false,
+    entryExample: "角色名-内心世界",
+    keywordsExample: ["角色名", "内心", "心理"],
+    contentGuide: "角色的内心想法和心理活动，包含但不限于**（角色名）的（某个时期）的内心世界**：、****原文内容**:、**内心独白**:、**情感变化**:、**动机分析**:、**心理矛盾**:等"
+  }
 ]
 
 const categories = ref<Category[]>(JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)))
@@ -48,7 +96,13 @@ const newCatName = ref('')
 function addCategory() {
   const n = newCatName.value.trim()
   if (!n || categories.value.find(c => c.name === n)) return
-  categories.value.push({ name: n, enabled: true, guide: `${n}的详细描述` })
+  categories.value.push({
+    name: n,
+    enabled: true,
+    entryExample: `${n}名称`,
+    keywordsExample: [`${n}名`, `别名`],
+    contentGuide: `基于原文的${n}描述，包含但不限于**名称**:、**特征**:等`
+  })
   newCatName.value = ''
 }
 
@@ -137,15 +191,33 @@ async function onDrop(e: DragEvent) {
 
 function detectChapters() {
   if (!fileContent.value) return
-  const re = new RegExp(`(${chapterRegex.value})`, 'gm')
-  const parts = fileContent.value.split(re)
-  const result: { title: string; content: string }[] = []
-  for (let i = 1; i < parts.length; i += 2) {
-    const title = parts[i].trim()
-    const content = (parts[i + 1] ?? '').trim()
-    if (content.length > 50) result.push({ title, content })
+  try {
+    const re = new RegExp(chapterRegex.value, 'gm')
+    const matches = [...fileContent.value.matchAll(re)]
+    
+    if (matches && matches.length > 0) {
+      const matchTexts = matches.map(match => match[0].trim())
+      
+      const result: { title: string; content: string }[] = []
+      for (let i = 0; i < matches.length; i++) {
+        const startIndex = matches[i].index!
+        const endIndex = i < matches.length - 1 ? matches[i + 1].index! : fileContent.value.length
+        
+        // slice the chapter content
+        const chapterContent = fileContent.value.slice(startIndex, endIndex).trim()
+        const title = matchTexts[i] || `第${i + 1}章`
+        
+        if (chapterContent.length > 50) {
+          result.push({ title, content: chapterContent })
+        }
+      }
+      chapters.value = result
+    } else {
+      chapters.value = []
+    }
+  } catch (err: any) {
+    console.error('正则表达式错误:', err)
   }
-  chapters.value = result
 }
 
 function chunkText(text: string, size: number) {
@@ -154,23 +226,446 @@ function chunkText(text: string, size: number) {
   return chunks
 }
 
-function buildPrompt(seg: string): string {
-  const enabledCats = categories.value.filter(c => c.enabled)
-  const catGuide = enabledCats.map(c => `- ${c.name}：${c.guide}`).join('\n')
-  const incrementalNote = incrementalMode.value
-    ? '（增量模式：只输出新发现的条目，如已存在同名条目则跳过）'
-    : ''
+function generateMainPromptJsonTemplate(): string {
+  const enabledCategories = categories.value.filter(c => c.enabled)
 
-  return `请根据以下小说片段，提取世界书条目${incrementalNote}。
-分类包括：
-${catGuide}
+  let template = '{\n'
+  const parts: string[] = []
 
-输出JSON数组格式：
-[{"category":"分类名","keys":["关键词"],"comment":"条目名","content":"详细内容（100字以上）"}]
-只输出JSON数组。
+  for (const cat of enabledCategories) {
+    parts.push(`"${cat.name}": {
+"${cat.entryExample}": {
+"关键词": ${JSON.stringify(cat.keywordsExample)},
+"内容": "${cat.contentGuide.replace(/"/g, '\\"')}"
+}
+}`)
+  }
 
-片段：
-${seg.slice(0, 2000)}`
+  // 添加剧情大纲（如果启用）
+  if (enablePlotOutline.value) {
+    parts.push(`"剧情大纲": {
+"主线剧情": {
+"关键词": ["主线", "核心剧情", "故事线"],
+"内容": "## 故事主线\\n**核心冲突**: 故事的中心矛盾\\n**主要目标**: 主角追求的目标\\n**阻碍因素**: 实现目标的障碍\\n\\n## 剧情阶段\\n**第一幕 - 起始**: 故事开端，世界观建立\\n**第二幕 - 发展**: 冲突升级，角色成长\\n**第三幕 - 高潮**: 决战时刻，矛盾爆发\\n**第四幕 - 结局**: [如已完结] 故事收尾\\n\\n## 关键转折点\\n1. **转折点1**: 描述和影响\\n2. **转折点2**: 描述和影响\\n3. **转折点3**: 描述和影响\\n\\n## 伏笔与暗线\\n**已揭示的伏笔**: 已经揭晓的铺垫\\n**未解之谜**: 尚未解答的疑问\\n**暗线推测**: 可能的隐藏剧情线"
+},
+"支线剧情": {
+"关键词": ["支线", "副线", "分支剧情"],
+"内容": "## 主要支线\\n**支线1标题**: 简要描述\\n**支线2标题**: 简要描述\\n**支线3标题**: 简要描述\\n\\n## 支线与主线的关联\\n**交织点**: 支线如何影响主线\\n**独立价值**: 支线的独特意义"
+}
+}`)
+  }
+
+  // 添加文风配置（如果启用）
+  if (enableLiteraryStyle.value) {
+    parts.push(`"文风配置": {
+"作品文风": {
+"关键词": ["文风", "写作风格", "叙事特点"],
+"内容": "基于原文分析的文风配置（YAML格式），包含以下三大系统：\\n\\n**叙事系统(narrative_system)**:\\n- **结构(structure)**: 故事组织方式、推进模式、结局处理\\n- **视角(perspective)**: 人称选择、聚焦类型、叙述距离\\n- **时间管理(time_management)**: 时序、时距、频率\\n- **节奏(rhythm)**: 句长模式、速度控制、标点节奏\\n\\n**表达系统(expression_system)**:\\n- **话语与描写(discourse_and_description)**: 话语风格、描写原则、具体技法\\n- **对话(dialogue)**: 对话功能、对话风格\\n- **人物塑造(characterization)**: 塑造方法、心理策略\\n- **感官编织(sensory_weaving)**: 感官优先级、通感技法\\n\\n**美学系统(aesthetics_system)**:\\n- **核心概念(core_concepts)**: 核心美学立场 and 关键词\\n- **意象与象征(imagery_and_symbolism)**: 季节意象、自然元素、色彩系统\\n- **语言与修辞(language_and_rhetoric)**: 句法特征、词汇偏好、修辞手法\\n- **整体效果(overall_effect)**: 阅读体验目标、美学哲学\\n\\n每个维度都应包含具体的原文示例和可操作的描述。"
+}
+}`)
+  }
+
+  template += parts.join(',\n')
+  template += '\n}'
+
+  return template
+}
+
+function generateFixPromptJsonStructure(): string {
+  const enabledCategories = categories.value.filter(c => c.enabled)
+
+  let structure = '{\n'
+  const parts: string[] = []
+
+  for (const cat of enabledCategories) {
+    parts.push(`  "${cat.name}": {\n    "条目名": { "关键词": ["..."], "内容": "..." }\n  }`)
+  }
+
+  parts.push(`  "剧情大纲": {\n    "主线剧情": { "关键词": ["..."], "内容": "..." },\n    "支线剧情": { "关键词": ["..."], "内容": "..." }\n  }`)
+  parts.push(`  "知识书": {\n    "条目名": { "关键词": ["..."], "内容": "..." }\n  }`)
+
+  if (enableLiteraryStyle.value) {
+    parts.push(`  "文风配置": {\n    "作品文风": { "关键词": ["文风", "写作风格", "叙事特点"], "内容": "..." }\n  }`)
+  }
+
+  structure += parts.join(',\n')
+  structure += '\n}'
+
+  return structure
+}
+
+function getCategoryNamesList(): string {
+  const enabledCategories = categories.value.filter(c => c.enabled)
+
+  const names = enabledCategories.map(cat => cat.name)
+  names.push('剧情大纲', '知识书')
+  if (enableLiteraryStyle.value) {
+    names.push('文风配置')
+  }
+
+  return names.join('/')
+}
+
+function getEnabledCategoriesDescription(): string {
+  const enabledCategories = categories.value.filter(c => c.enabled)
+  return enabledCategories.map(cat => cat.name).join('、')
+}
+
+function convertWorldbookValueToString(val: any, depth = 0): string {
+  if (val === null || val === undefined) {
+    return '';
+  }
+  if (typeof val === 'string') {
+    return val;
+  }
+  if (typeof val !== 'object') {
+    return String(val);
+  }
+  if (Array.isArray(val)) {
+    return val.map(item => {
+      if (typeof item === 'object' && item !== null) {
+        return convertWorldbookValueToString(item, depth + 1);
+      }
+      return String(item);
+    }).join('\n');
+  }
+  return Object.keys(val).map(key => {
+    const subVal = val[key];
+    const indent = '  '.repeat(depth);
+    if (typeof subVal === 'object' && subVal !== null) {
+      const nestedStr = convertWorldbookValueToString(subVal, depth + 1);
+      return `${indent}**${key}**:\n${nestedStr}`;
+    }
+    return `${indent}**${key}**: ${subVal}`;
+  }).join('\n');
+}
+
+function normalizeWorldbookEntry(entry: any) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+
+  if (entry.content !== undefined && entry['内容'] !== undefined) {
+    const contentLen = String(entry.content || '').length;
+    const neirongLen = String(entry['内容'] || '').length;
+    if (contentLen > neirongLen) {
+      entry['内容'] = entry.content;
+    }
+    delete entry.content;
+  } else if (entry.content !== undefined) {
+    entry['内容'] = entry.content;
+    delete entry.content;
+  }
+
+  if (entry['内容'] !== undefined) {
+    entry['内容'] = convertWorldbookValueToString(entry['内容']);
+  }
+
+  if (entry['关键词'] !== undefined) {
+    if (Array.isArray(entry['关键词'])) {
+      entry['关键词'] = entry['关键词'].map((k: any) => typeof k === 'object' ? convertWorldbookValueToString(k) : String(k));
+    } else if (typeof entry['关键词'] === 'string') {
+      entry['关键词'] = entry['关键词'].split(/[,，、\s]+/).map((k: string) => k.trim()).filter(Boolean);
+    } else {
+      entry['关键词'] = [convertWorldbookValueToString(entry['关键词'])];
+    }
+  }
+
+  if (entry.comment !== undefined) {
+    entry.comment = convertWorldbookValueToString(entry.comment);
+  }
+
+  return entry;
+}
+
+function normalizeWorldbookData(data: any) {
+  if (!data || typeof data !== 'object') return data;
+
+  for (const category in data) {
+    if (typeof data[category] === 'object' && data[category] !== null && !Array.isArray(data[category])) {
+      if (data[category]['关键词'] || data[category]['内容'] || data[category].content) {
+        normalizeWorldbookEntry(data[category]);
+      } else {
+        for (const entryName in data[category]) {
+          if (typeof data[category][entryName] === 'object') {
+            normalizeWorldbookEntry(data[category][entryName]);
+          }
+        }
+      }
+    }
+  }
+  return data;
+}
+
+function mergeWorldbookDataIncremental(target: any, source: any) {
+  normalizeWorldbookData(source);
+
+  for (const category in source) {
+    if (typeof source[category] !== 'object' || source[category] === null) continue;
+
+    if (!target[category]) {
+      target[category] = {};
+    }
+
+    for (const entryName in source[category]) {
+      const sourceEntry = source[category][entryName];
+      if (typeof sourceEntry !== 'object' || sourceEntry === null) continue;
+
+      if (target[category][entryName]) {
+        const targetEntry = target[category][entryName];
+
+        if (Array.isArray(sourceEntry['关键词']) && Array.isArray(targetEntry['关键词'])) {
+          targetEntry['关键词'] = [...new Set([...targetEntry['关键词'], ...sourceEntry['关键词']])];
+        } else if (Array.isArray(sourceEntry['关键词'])) {
+          targetEntry['关键词'] = sourceEntry['关键词'];
+        }
+
+        if (sourceEntry['内容']) {
+          targetEntry['内容'] = sourceEntry['内容'];
+        }
+      } else {
+        target[category][entryName] = sourceEntry;
+      }
+    }
+  }
+}
+
+function mergeWorldbookData(target: any, source: any) {
+  normalizeWorldbookData(source);
+
+  for (const key in source) {
+    if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
+      if (!target[key]) target[key] = {};
+      mergeWorldbookData(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+}
+
+function convertGeneratedWorldbookToStandard(generatedWb: any): WorldBookEntry[] {
+  const standardWorldbook: WorldBookEntry[] = []
+  let insertionOrder = 0
+
+  const triggerCategories = new Set(['地点', '剧情大纲', '章节剧情'])
+
+  Object.keys(generatedWb).forEach(category => {
+    const categoryData = generatedWb[category]
+    const isTriggerCategory = triggerCategories.has(category)
+    const constant = !isTriggerCategory
+    const selective = isTriggerCategory
+
+    if (typeof categoryData === 'object' && categoryData !== null) {
+      Object.keys(categoryData).forEach(itemName => {
+        const itemData = categoryData[itemName]
+
+        if (typeof itemData === 'object' && itemData !== null && itemData.关键词 && itemData.内容) {
+          standardWorldbook.push({
+            id: crypto.randomUUID(),
+            keys: Array.isArray(itemData.关键词) ? itemData.关键词 : [itemName],
+            secondary_keys: [],
+            comment: `[${category}] ${itemName}`,
+            content: itemData.内容,
+            enabled: true,
+            position: 'before_char',
+            constant,
+            selective,
+            parentId: null,
+            insertion_order: insertionOrder++
+          })
+        } else if (typeof itemData === 'string') {
+          standardWorldbook.push({
+            id: crypto.randomUUID(),
+            keys: [itemName],
+            secondary_keys: [],
+            comment: `[${category}] ${itemName}`,
+            content: itemData,
+            enabled: true,
+            position: 'before_char',
+            constant,
+            selective,
+            parentId: null,
+            insertion_order: insertionOrder++
+          })
+        }
+      })
+    }
+  })
+
+  return standardWorldbook
+}
+
+function extractWorldbookDataByRegex(jsonString: string): any {
+  const result: any = {}
+  const categoriesList = ['角色', '地点', '组织', '剧情大纲', '知识书', '文风配置', '章节剧情', '道具', '玩法', '角色内心']
+
+  for (const category of categoriesList) {
+    const categoryPattern = new RegExp(`"${category}"\\s*:\\s*\\{`, 'g')
+    const categoryMatch = categoryPattern.exec(jsonString)
+    if (!categoryMatch) continue
+
+    const startPos = (categoryMatch.index ?? 0) + categoryMatch[0].length
+    let braceCount = 1
+    let endPos = startPos
+    while (braceCount > 0 && endPos < jsonString.length) {
+      if (jsonString[endPos] === '{') braceCount++
+      if (jsonString[endPos] === '}') braceCount--
+      endPos++
+    }
+
+    if (braceCount !== 0) continue
+
+    const categoryContent = jsonString.substring(startPos, endPos - 1)
+    result[category] = {}
+
+    const entryPattern = /"([^"]+)"\s*:\s*\{/g
+    let entryMatch: RegExpExecArray | null
+
+    while ((entryMatch = entryPattern.exec(categoryContent)) !== null) {
+      const entryName = entryMatch[1]
+      const entryStartPos = (entryMatch.index ?? 0) + entryMatch[0].length
+
+      let entryBraceCount = 1
+      let entryEndPos = entryStartPos
+      while (entryBraceCount > 0 && entryEndPos < categoryContent.length) {
+        if (categoryContent[entryEndPos] === '{') entryBraceCount++
+        if (categoryContent[entryEndPos] === '}') entryBraceCount--
+        entryEndPos++
+      }
+
+      if (entryBraceCount !== 0) continue
+
+      const entryContent = categoryContent.substring(entryStartPos, entryEndPos - 1)
+
+      let keywords: string[] = []
+      const keywordsMatch = entryContent.match(/"关键词"\s*:\s*\[([\s\S]*?)\]/)
+      if (keywordsMatch) {
+        const keywordStrings = keywordsMatch[1].match(/"([^"]+)"/g)
+        if (keywordStrings) {
+          keywords = keywordStrings.map(s => s.replace(/"/g, ''))
+        }
+      }
+
+      let content = ''
+      const contentMatch = entryContent.match(/"内容"\s*:\s*"/)
+      if (contentMatch) {
+        const contentStartPos = (contentMatch.index ?? 0) + contentMatch[0].length
+        let contentEndPos = contentStartPos
+        let escaped = false
+        while (contentEndPos < entryContent.length) {
+          const char = entryContent[contentEndPos]
+          if (escaped) {
+            escaped = false
+          } else if (char === '\\') {
+            escaped = true;
+          } else if (char === '"') {
+            break;
+          }
+          contentEndPos++
+        }
+        content = entryContent.substring(contentStartPos, contentEndPos)
+        try {
+          content = JSON.parse(`"${content}"`)
+        } catch (e) {
+          content = content.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+        }
+      }
+
+      if (content || keywords.length > 0) {
+        result[category][entryName] = {
+          '关键词': keywords,
+          '内容': content
+        }
+      }
+    }
+  }
+
+  return result
+}
+
+function buildPrompt(seg: string, index: number, segments: string[], localGeneratedWorldbook: any): string {
+  const jsonTemplate = generateMainPromptJsonTemplate()
+  const enabledCategoriesDesc = getEnabledCategoriesDescription()
+
+  let prompt = `你是专业的小说世界书生成专家。请仔细阅读提供的小说内容，提取其中的关键信息，生成高质量的世界书条目。
+
+## 重要要求
+1. **必须基于提供的具体小说内容**，不要生成通用模板
+2. **只提取文中明确出现的${enabledCategoriesDesc}等信息**
+3. **关键词必须是文中实际出现的名称**，用逗号分隔
+4. **内容必须基于原文描述**，不要添加原文没有的信息
+5. **内容使用markdown格式**，可以层层嵌套或使用序号标题
+
+## 📤 输出格式
+请生成标准JSON格式，确保能被JavaScript正确解析：
+
+\`\`\`json
+${jsonTemplate}
+\`\`\`
+
+## 重要提醒
+- 直接输出JSON，不要包含代码块标记
+- 所有信息必须来源于原文，不要编造
+- 关键词必须是文中实际出现的词语
+- 内容描述要完整但简洁${enablePlotOutline.value ? '\n- 剧情大纲是必需项，必须生成' : ''}${enableLiteraryStyle.value ? '\n- 文风配置字段为可选项，如果能够分析出明确的文风特征则生成，否则可以省略' : ''}
+
+`
+
+  if (index > 0) {
+    const prevSeg = segments[index - 1]
+    prompt += `这是你上一次阅读的结尾部分：
+---
+${prevSeg.slice(-500)}
+---
+
+`
+    prompt += `这是当前你对该作品的记忆：
+${JSON.stringify(localGeneratedWorldbook, null, 2)}
+
+`
+  }
+
+  prompt += `这是你现在阅读的部分：
+---
+${seg}
+---
+
+`
+
+  if (index === 0) {
+    prompt += `现在开始分析小说内容，请专注于提取文中实际出现的信息：
+
+`
+  } else {
+    if (incrementalMode.value) {
+      prompt += `请基于新内容**增量更新**世界书，采用**点对点覆盖**模式：
+
+**增量输出规则**：
+1. **只输出本次需要变更的条目**，不要输出完整的世界书
+2. **新增条目**：直接输出新条目的完整内容
+3. **修改条目**：输出该条目的完整新内容（会覆盖原有内容）
+4. **未变更的条目不要输出**，系统会自动保留
+5. **关键词合并**：新关键词会自动与原有关键词合并，无需重复原有关键词
+
+**示例**：如果只有"张三"角色有新信息，只需输出：
+{"角色": {"张三": {"关键词": ["新称呼"], "内容": "更新后的完整描述..."}}}
+
+`
+    } else {
+      prompt += `请基于新内容**累积补充**世界书，注意以下要点：
+
+**重要规则**：
+1. **已有角色**：如果角色已存在，请在原有内容基础上**追加新信息**，不要删除或覆盖已有描述
+2. **新角色**：如果是新出现的角色，添加为新条目
+3. **剧情大纲**：持续追踪主线发展，**追加新的剧情进展**而不是重写
+4. **关键词**：为已有条目补充新的关键词（如新称呼、新关系等）
+5. **保持完整性**：确保之前章节提取的重要信息不会丢失
+
+`
+    }
+  }
+
+  prompt += `请直接输出JSON格式的结果，不要添加任何代码块标记或解释文字。`
+
+  return prompt
 }
 
 async function generateWorldbook() {
@@ -180,10 +675,39 @@ async function generateWorldbook() {
   abortCtrl.value = new AbortController()
   currentPrompt.value = ''
   currentResponse.value = ''
+  
+  let localGeneratedWorldbook: any = {}
+
   if (!incrementalMode.value) {
     worldbook.value = { name: fileName.value.replace(/\.[^.]+$/, ''), entries: [] }
   } else if (!worldbook.value.name) {
     worldbook.value.name = fileName.value.replace(/\.[^.]+$/, '')
+  }
+
+  if (incrementalMode.value && worldbook.value.entries.length > 0) {
+    worldbook.value.entries.forEach(entry => {
+      const match = entry.comment.match(/^\[(.*?)\]\s*(.*)$/)
+      let category = '知识书'
+      let itemName = entry.comment
+      if (match) {
+        category = match[1]
+        itemName = match[2]
+      }
+      if (!localGeneratedWorldbook[category]) {
+        localGeneratedWorldbook[category] = {}
+      }
+      localGeneratedWorldbook[category][itemName] = {
+        '关键词': entry.keys,
+        '内容': entry.content
+      }
+    })
+  } else {
+    localGeneratedWorldbook = {
+      '角色': {},
+      '地点': {},
+      '组织': {},
+      '知识书': {}
+    }
   }
 
   const segments = chapters.value.length > 0
@@ -192,37 +716,126 @@ async function generateWorldbook() {
 
   progress.value = { current: 0, total: segments.length }
 
-  for (const seg of segments) {
+  for (let idx = 0; idx < segments.length; idx++) {
     if (abortCtrl.value.signal.aborted) break
     progress.value.current++
+    const seg = segments[idx]
+    
     try {
       let json = ''
-      currentPrompt.value = buildPrompt(seg)
+      currentPrompt.value = buildPrompt(seg, idx, segments, localGeneratedWorldbook)
       currentResponse.value = ''
+      
       await streamChat(cfg, [{ role: 'user', content: currentPrompt.value }], d => {
         json += d
         currentResponse.value = json
       }, abortCtrl.value.signal)
-      const match = json.match(/\[[\s\S]*\]/)
-      if (match) {
-        const entries: { category?: string; keys: string[]; comment?: string; content: string }[] = JSON.parse(match[0])
-        for (const e of entries) {
-          // 增量模式：跳过重复条目
-          if (incrementalMode.value) {
-            const dup = worldbook.value.entries.find(x =>
-              x.comment === (e.comment || '') || x.keys.some(k => e.keys.includes(k))
-            )
-            if (dup) { dup.content = e.content; continue }
+      
+      let memoryUpdate: any = null
+      try {
+        memoryUpdate = JSON.parse(json)
+      } catch (jsonError: any) {
+        let cleanResponse = json.trim()
+        cleanResponse = cleanResponse.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+        if (!cleanResponse.startsWith('{')) {
+          const firstBrace = cleanResponse.indexOf('{')
+          const lastBrace = cleanResponse.lastIndexOf('}')
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            cleanResponse = cleanResponse.substring(firstBrace, lastBrace + 1)
           }
-          worldbook.value.entries.push({
-            id: crypto.randomUUID(), keys: e.keys,
-            content: e.content, enabled: true,
-            insertion_order: worldbook.value.entries.length,
-            comment: e.comment || e.category || '',
-            selective: false, secondary_keys: [],
-            constant: false, position: 'before_char', parentId: null,
-          } satisfies WorldBookEntry)
         }
+        
+        try {
+          memoryUpdate = JSON.parse(cleanResponse)
+        } catch (secondError: any) {
+          const openBraces = (cleanResponse.match(/{/g) || []).length
+          const closeBraces = (cleanResponse.match(/}/g) || []).length
+          const missingBraces = openBraces - closeBraces
+          
+          let parsedWithAutoFix = false
+          if (missingBraces > 0) {
+            try {
+              memoryUpdate = JSON.parse(cleanResponse + '}'.repeat(missingBraces))
+              parsedWithAutoFix = true
+            } catch (autoFixErr) {
+              // Ignore
+            }
+          }
+          
+          if (!parsedWithAutoFix) {
+            const regexExtractedData = extractWorldbookDataByRegex(cleanResponse)
+            if (regexExtractedData && Object.keys(regexExtractedData).length > 0) {
+              memoryUpdate = regexExtractedData
+            } else {
+              // Format fixing prompt
+              const fixPrompt = `你是专业的JSON修复专家。请将下面“格式错误的JSON文本”修复为严格有效、可被 JavaScript 的 JSON.parse() 直接解析的JSON。
+
+## 📋 核心要求
+1. **只修复格式**：保持原有数据语义与内容不变，不要总结、不要改写字段名、不要增删字段。
+2. **输出必须是单个JSON对象**：返回内容必须从第一个字符“{”开始，到最后一个字符“}”结束。
+3. **禁止任何额外输出**：不要包含解释文字、不要包含Markdown、不要包含代码块标记、不要包含前后缀、不要输出多段内容。
+4. **严格JSON语法**：
+   - 所有key必须用双引号包裹
+   - 字符串必须使用双引号
+   - 不允许尾随逗号
+   - 不允许注释
+5. **字符串换行与特殊字符必须正确转义**：字符串中的换行必须使用 \\n，反斜杠与引号必须正确转义。
+
+## 🧩 世界书JSON基本嵌套结构（必须遵循）
+修复后的JSON应尽量保持/恢复为以下结构（允许只包含其中一部分分类，但结构层级必须一致）：
+
+${generateFixPromptJsonStructure()}
+
+要求：
+- 顶层的每个分类（例如"${getCategoryNamesList()}"）的值必须是对象。
+- 分类下每个条目的值必须是对象，且包含 "关键词"(数组) 与 "内容"(字符串) 两个字段。
+- 如果原文中某条目值不是对象（比如直接是字符串），请在不改变语义的前提下包装成 {"关键词":[], "内容":"原内容"}。
+
+## 📤 输出格式
+直接输出修复后的JSON（不要包含任何其他字符）。
+
+## 错误信息（用于定位，不需要复述）
+${secondError.message}
+
+## 需要修复的JSON文本
+${cleanResponse}
+`
+              let fixedJson = ''
+              await streamChat(cfg, [{ role: 'user', content: fixPrompt }], d => {
+                fixedJson += d
+              }, abortCtrl.value.signal)
+              
+              let cleanedFixed = fixedJson.trim().replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+              const firstBrace = cleanedFixed.indexOf('{')
+              const lastBrace = cleanedFixed.lastIndexOf('}')
+              if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                cleanedFixed = cleanedFixed.substring(firstBrace, lastBrace + 1)
+              }
+              
+              try {
+                memoryUpdate = JSON.parse(cleanedFixed)
+              } catch (fixErr) {
+                memoryUpdate = {
+                  '知识书': {
+                    [`第${idx + 1}章_解析失败`]: {
+                      '关键词': ['解析失败', '格式错误'],
+                      '内容': `**解析失败原因**: ${secondError.message}\n\n**原始响应预览**:\n${cleanResponse}`
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (memoryUpdate) {
+        if (incrementalMode.value) {
+          mergeWorldbookDataIncremental(localGeneratedWorldbook, memoryUpdate)
+        } else {
+          mergeWorldbookData(localGeneratedWorldbook, memoryUpdate)
+        }
+        worldbook.value.entries = convertGeneratedWorldbookToStandard(localGeneratedWorldbook)
       }
     } catch (err: unknown) {
       if ((err as Error)?.name === 'AbortError') break
@@ -316,6 +929,23 @@ const progressPct = computed(() =>
               <button @click="detectChapters" :disabled="!fileContent" class="btn-secondary whitespace-nowrap text-[11px] font-bold px-3 py-2 rounded-xl cursor-pointer">识别</button>
             </div>
           </div>
+
+          <div class="border-t border-white/5 pt-3 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between">
+              <div class="flex flex-col">
+                <span class="text-[11px] font-bold text-zinc-100">生成剧情大纲</span>
+                <span class="text-[9px] text-[var(--text-muted)] mt-0.5">分析并生成故事的主线与支线剧情</span>
+              </div>
+              <input type="checkbox" v-model="enablePlotOutline" class="accent-[var(--primary)] w-4 h-4 rounded cursor-pointer" />
+            </div>
+            <div class="flex items-center justify-between border-t border-white/5 pt-2.5">
+              <div class="flex flex-col">
+                <span class="text-[11px] font-bold text-zinc-100">分析写作文风</span>
+                <span class="text-[9px] text-[var(--text-muted)] mt-0.5">提取叙事、表达与美学文风参数</span>
+              </div>
+              <input type="checkbox" v-model="enableLiteraryStyle" class="accent-[var(--primary)] w-4 h-4 rounded cursor-pointer" />
+            </div>
+          </div>
         </div>
 
         <!-- Incremental Mode Banner -->
@@ -324,7 +954,7 @@ const progressPct = computed(() =>
             <span class="text-lg">🔄</span>
             <div class="flex flex-col">
               <span class="text-[11px] font-bold text-zinc-100">智能增量提取模式</span>
-              <span class="text-[9px] text-[var(--text-muted)] mt-0.5">开启后将自动跳过重复条目，仅做内容更新</span>
+              <span class="text-[9px] text-[var(--text-muted)] mt-0.5">开启后将自动覆盖已有条目，合并触发关键词</span>
             </div>
           </div>
           <label class="relative inline-flex items-center cursor-pointer select-none">
@@ -347,8 +977,8 @@ const progressPct = computed(() =>
                 <input type="checkbox" v-model="cat.enabled" class="accent-[var(--primary)] w-3.5 h-3.5 rounded" />
                 <span class="text-xs font-bold text-zinc-200 w-12">{{ cat.name }}</span>
               </label>
-              <input v-model="cat.guide" class="input flex-1 py-1 px-2 text-[11px]" placeholder="提取指导..." />
-              <button v-if="!['角色','地点','组织'].includes(cat.name)"
+              <input v-model="cat.contentGuide" class="input flex-1 py-1 px-2 text-[11px]" placeholder="提取指导..." />
+              <button v-if="!['角色','地点','组织','道具','玩法','章节剧情','角色内心'].includes(cat.name)"
                 @click="removeCategory(i)" class="text-red-400 hover:text-red-300 text-xs shrink-0 cursor-pointer p-0.5">✕</button>
             </div>
             
