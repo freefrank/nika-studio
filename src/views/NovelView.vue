@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-
-const props = withDefaults(defineProps<{ standalone?: boolean }>(), { standalone: true })
 import { settingsService } from '@/services/settingsService'
 import { streamChat } from '@/services/apiService'
 import { useCharacterStore } from '@/stores/characterStore'
 import type { Character, WorldBook, WorldBookEntry } from '@/types'
 import { openDB, tx, cloneForStorage } from '@/services/db'
+import { marked } from 'marked'
+
+const props = withDefaults(defineProps<{ standalone?: boolean }>(), { standalone: true })
 
 const router = useRouter()
 const charStore = useCharacterStore()
@@ -35,6 +36,25 @@ const savedStateInfo = ref({ fileName: '', progress: '', percent: 0 })
 const STATE_DB = 'NikaNovelStateDB'
 const STATE_STORE = 'novel_state'
 const showChaptersList = ref(true)
+
+const expandedEntries = ref<Record<string, boolean>>({})
+
+function toggleEntry(id: string) {
+  expandedEntries.value[id] = !expandedEntries.value[id]
+}
+
+function isContentLong(content: string) {
+  return content.length > 120 || content.includes('\n')
+}
+
+function renderMarkdown(content: string) {
+  try {
+    return marked.parse(content)
+  } catch (e) {
+    console.error('Failed to parse markdown:', e)
+    return content
+  }
+}
 
 // 自定义分类系统
 interface Category {
@@ -1324,12 +1344,26 @@ const progressPct = computed(() =>
           
           <div class="flex flex-col gap-2.5 max-h-[60vh] overflow-y-auto pr-1 scroll-thin">
             <div v-for="entry in worldbook.entries" :key="entry.id"
-              class="bg-zinc-900/35 border border-white/5 rounded-2xl p-4 text-xs shadow-inner hover:border-purple-500/10 transition-all animate-fade-in">
+              class="bg-zinc-900/35 border border-white/5 rounded-2xl p-4 text-xs shadow-inner hover:border-purple-500/10 transition-all animate-fade-in flex flex-col relative overflow-hidden">
               <div class="text-[var(--primary)] font-extrabold mb-1.5 flex items-center justify-between">
                 <span class="text-zinc-100 text-sm">{{ entry.comment || '未命名分类' }}</span>
                 <span class="text-[9px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-md font-mono">🔑 {{ entry.keys.join(', ') || '(无触发词)' }}</span>
               </div>
-              <p class="text-[var(--text-muted)] leading-relaxed select-text mt-2 border-t border-white/3 pt-2 font-medium">{{ entry.content }}</p>
+              
+              <div 
+                class="markdown-body text-zinc-300 mt-2 border-t border-white/5 pt-2 select-text font-medium transition-all duration-300 overflow-hidden"
+                :class="expandedEntries[entry.id] ? 'pb-2' : 'max-h-[72px] mask-gradient pb-2'"
+                v-html="renderMarkdown(entry.content)"
+              />
+
+              <div v-if="isContentLong(entry.content)" class="flex justify-end mt-1">
+                <button 
+                  @click="toggleEntry(entry.id)" 
+                  class="text-[10px] text-purple-400 hover:text-purple-300 font-bold flex items-center gap-0.5 transition-colors cursor-pointer select-none"
+                >
+                  <span>{{ expandedEntries[entry.id] ? '▲ 收起' : '▼ 展开' }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1377,5 +1411,33 @@ const progressPct = computed(() =>
 .scroll-thin::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 9999px;
+}
+
+.mask-gradient {
+  mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+}
+
+/* Markdown content styling */
+.markdown-body :deep(p) {
+  @apply mb-2 last:mb-0 leading-relaxed;
+}
+.markdown-body :deep(strong) {
+  @apply text-zinc-100 font-bold;
+}
+.markdown-body :deep(ul), .markdown-body :deep(ol) {
+  @apply pl-4 mb-2;
+}
+.markdown-body :deep(ul) {
+  @apply list-disc;
+}
+.markdown-body :deep(ol) {
+  @apply list-decimal;
+}
+.markdown-body :deep(li) {
+  @apply mb-1;
+}
+.markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3), .markdown-body :deep(h4) {
+  @apply font-bold text-zinc-100 mt-2 mb-1;
 }
 </style>
