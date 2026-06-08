@@ -69,6 +69,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    allowedHosts: ['nika.zkx.ca'],
     proxy: {
       '/proxy': {
         target: 'http://localhost',
