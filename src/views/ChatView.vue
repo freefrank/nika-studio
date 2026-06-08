@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch, inject, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCharacterStore } from '@/stores/characterStore'
 import { chatService } from '@/services/chatService'
@@ -13,6 +13,13 @@ import type { ChatSession, ChatMessage } from '@/types'
 const route = useRoute()
 const router = useRouter()
 const charStore = useCharacterStore()
+const globalShowSettings = inject<Ref<boolean>>('showSettings')
+
+function openGlobalSettings() {
+  if (globalShowSettings) {
+    globalShowSettings.value = true
+  }
+}
 
 const characterId = route.params.id as string
 const session = ref<ChatSession | null>(null)
@@ -243,7 +250,7 @@ function saveSettings() { settingsService.save(settings.value); showSettings.val
         <label for="chat-use-local-proxy" class="text-xs text-zinc-300 font-semibold cursor-pointer">使用本地开发代理 (解决 CORS 跨源限制)</label>
       </div>
       <div class="flex justify-end gap-2 border-t border-white/5 pt-3">
-        <button @click="router.push('/settings')" class="btn-sm text-xs py-1.5 px-3.5 font-semibold">更多高级设置</button>
+        <button @click="openGlobalSettings" class="btn-sm text-xs py-1.5 px-3.5 font-semibold">更多高级设置</button>
         <button @click="saveSettings" class="btn-primary-sm py-1.5 px-4 font-bold text-xs rounded-xl shadow-md shadow-purple-500/15">确认保存</button>
       </div>
     </div>

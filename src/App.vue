@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, provide } from 'vue'
 import pkg from '../package.json'
 import { useApiConfigStore } from '@/stores/apiConfigStore'
+import SettingsModal from '@/components/SettingsModal.vue'
+
+const showSettings = ref(false)
+provide('showSettings', showSettings)
 
 const isLoggedIn = ref(false)
 const currentUsername = ref('')
@@ -191,8 +195,18 @@ const logout = () => {
     </div>
   </div>
 
-  <div v-else class="h-screen w-screen overflow-hidden">
+  <div v-else class="h-screen w-screen overflow-hidden relative">
     <RouterView />
+    
+    <!-- Floating Settings Bubble Button -->
+    <button @click="showSettings = !showSettings" 
+      class="fixed bottom-3 right-16 z-40 w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 border border-white/10 flex items-center justify-center text-xs shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-110 active:scale-95 transition-all cursor-pointer select-none"
+      title="全局设置">
+      ⚙️
+    </button>
+
+    <!-- Floating Settings Modal Overlay -->
+    <SettingsModal v-if="showSettings" @close="showSettings = false" />
     
     <!-- Floating Version Badge -->
     <div class="fixed bottom-3 right-3 z-50 bg-zinc-950/70 border border-white/10 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-medium text-zinc-400 select-none pointer-events-none tracking-wider shadow-[0_2px_10px_rgba(0,0,0,0.5)]">

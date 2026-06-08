@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCharacterStore } from '@/stores/characterStore'
 import type { Character } from '@/types'
@@ -11,6 +11,7 @@ const store = useCharacterStore()
 const search = ref('')
 const filterTag = ref('')
 const activeTab = ref<'characters' | 'novel'>('characters')
+const showSettings = inject<Ref<boolean>>('showSettings')
 
 onMounted(() => store.load())
 
@@ -80,7 +81,7 @@ async function importCharacter(e: Event) {
         <h1 class="text-2xl font-extrabold text-gradient-primary tracking-wide">妮卡角色工作室 Pro</h1>
       </div>
       <div class="flex items-center gap-3">
-        <button @click="router.push('/settings')" class="btn-secondary flex items-center gap-2 py-2 px-4 text-xs font-bold rounded-xl">
+        <button @click="showSettings = true" class="btn-secondary flex items-center gap-2 py-2 px-4 text-xs font-bold rounded-xl">
           <span>⚙️</span> 设置
         </button>
       </div>
