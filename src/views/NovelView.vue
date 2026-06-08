@@ -1529,6 +1529,10 @@ async function createIndependentCharacterCard(entry: WorldBookEntry) {
 const progressPct = computed(() =>
   progress.value.total ? Math.round(progress.value.current / progress.value.total * 100) : 0
 )
+
+const workspaceHeight = computed(() => {
+  return props.standalone ? 'calc(100vh - 100px)' : 'calc(100vh - 220px)'
+})
 </script>
 
 <template>
@@ -1876,7 +1880,7 @@ const progressPct = computed(() =>
 
 @media (min-width: 1024px) {
   .novel-workspace-container {
-    height: v-bind('props.standalone ? "calc(100vh - 100px)" : "calc(100vh - 220px)"') !important;
+    height: v-bind(workspaceHeight) !important;
     overflow: hidden;
   }
   .novel-column-scrollable {
