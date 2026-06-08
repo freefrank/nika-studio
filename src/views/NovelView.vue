@@ -1539,10 +1539,9 @@ const progressPct = computed(() =>
       <span class="font-extrabold text-sm md:text-base tracking-wide text-gradient-primary flex-1">📚 小说转世界书 (Novel to Lorebook)</span>
     </header>
 
-    <div class="flex-1 max-w-7xl mx-auto w-full p-5 flex flex-col lg:flex-row gap-6 items-stretch lg:overflow-hidden animate-fade-in"
-      :class="standalone ? 'lg:h-[calc(100vh-100px)]' : 'lg:h-[calc(100vh-220px)]'">
+    <div class="flex-1 max-w-7xl mx-auto w-full p-5 flex flex-col lg:flex-row gap-6 items-stretch novel-workspace-container animate-fade-in">
       <!-- Left Column: Inputs & Controls (Scrollable on Desktop) -->
-      <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-2 scroll-thin">
+      <div class="w-full lg:w-[380px] shrink-0 flex flex-col gap-4 novel-column-scrollable lg:pr-2 scroll-thin">
         
         <!-- Resume Progress Banner -->
         <div v-if="hasSavedState" class="glass-card rounded-2xl p-4 border border-purple-500/20 bg-purple-500/5 flex flex-col gap-2.5 shadow-md animate-fade-in">
@@ -1664,7 +1663,7 @@ const progressPct = computed(() =>
       </div>
 
       <!-- Right Column: Live Output & Results (Scrollable on Desktop) -->
-      <div class="flex-1 w-full min-w-0 flex flex-col gap-5 lg:h-full lg:overflow-y-auto lg:pr-2 scroll-thin">
+      <div class="flex-1 w-full min-w-0 flex flex-col gap-5 novel-column-scrollable lg:pr-2 scroll-thin">
         
         <!-- Action Button -->
         <div class="flex gap-2.5 shrink-0">
@@ -1873,5 +1872,17 @@ const progressPct = computed(() =>
 }
 .markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3), .markdown-body :deep(h4) {
   @apply font-bold text-zinc-100 mt-2 mb-1;
+}
+
+@media (min-width: 1024px) {
+  .novel-workspace-container {
+    height: v-bind('props.standalone ? "calc(100vh - 100px)" : "calc(100vh - 220px)"') !important;
+    overflow: hidden;
+  }
+  .novel-column-scrollable {
+    height: 100% !important;
+    overflow-y: auto !important;
+    min-height: 0 !important;
+  }
 }
 </style>
