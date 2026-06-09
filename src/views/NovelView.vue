@@ -30,6 +30,7 @@ const enablePlotOutline = ref(true)
 const enableLiteraryStyle = ref(false)
 const currentPrompt = ref('')
 const currentResponse = ref('')
+const currentMemoryStats = ref<{ matchedCount: number; totalCount: number; estimatedChars: number } | null>(null)
 
 const localGeneratedWorldbookRef = ref<any>({})
 const hasSavedState = ref(false)
@@ -869,6 +870,79 @@ function extractWorldbookDataByRegex(jsonString: string): any {
   return result
 }
 
+const RELEVANT_MEMORY_CHAR_LIMIT = 12000
+
+interface RelevantMemoryResult {
+  context: string
+  matchedCount: number
+  totalCount: number
+  estimatedChars: number
+}
+
+function buildRelevantMemory(seg: string, localGeneratedWorldbook: any): RelevantMemoryResult {
+  // Build flat list of all entries with their match score
+  type EntryCandidate = { category: string; name: string; entry: any; score: number }
+  const candidates: EntryCandidate[] = []
+  let totalCount = 0
+
+  for (const category in localGeneratedWorldbook) {
+    const cat = localGeneratedWorldbook[category]
+    if (typeof cat !== 'object' || cat === null) continue
+    for (const name in cat) {
+      const entry = cat[name]
+      if (typeof entry !== 'object' || entry === null) continue
+      totalCount++
+
+      // Score: name match = 2, each keyword match = 1
+      let score = 0
+      if (seg.includes(name)) score += 2
+      const keywords: string[] = Array.isArray(entry['关键词']) ? entry['关键词'] : []
+      for (const kw of keywords) {
+        if (kw && seg.includes(kw)) score += 1
+      }
+      candidates.push({ category, name, entry, score })
+    }
+  }
+
+  // Sort: matched first (score > 0), then by score desc
+  candidates.sort((a, b) => b.score - a.score)
+
+  // Build global index (always included, just names)
+  const indexByCategory: Record<string, string[]> = {}
+  for (const c of candidates) {
+    if (!indexByCategory[c.category]) indexByCategory[c.category] = []
+    indexByCategory[c.category].push(c.name)
+  }
+  const globalIndex = Object.entries(indexByCategory)
+    .map(([cat, names]) => `${cat}: ${names.join('、')}`)
+    .join('\n')
+  const indexSection = `[已知条目索引]\n${globalIndex || '（暂无）'}`
+
+  // Fill matched entries up to char limit
+  const matched: EntryCandidate[] = []
+  let usedChars = indexSection.length
+
+  for (const c of candidates) {
+    if (c.score === 0) break
+    const serialized = JSON.stringify({ [c.category]: { [c.name]: c.entry } })
+    if (usedChars + serialized.length > RELEVANT_MEMORY_CHAR_LIMIT) continue
+    matched.push(c)
+    usedChars += serialized.length
+  }
+
+  // Build output object with only matched entries
+  const relevant: any = {}
+  for (const c of matched) {
+    if (!relevant[c.category]) relevant[c.category] = {}
+    relevant[c.category][c.name] = c.entry
+  }
+
+  const context = indexSection + '\n\n[相关条目]\n' +
+    (matched.length > 0 ? JSON.stringify(relevant, null, 2) : '（当前分片无匹配条目）')
+
+  return { context, matchedCount: matched.length, totalCount, estimatedChars: usedChars }
+}
+
 function buildPrompt(seg: string, index: number, segments: string[], localGeneratedWorldbook: any): string {
   const jsonTemplate = generateMainPromptJsonTemplate()
   const enabledCategoriesDesc = getEnabledCategoriesDescription()
@@ -905,8 +979,10 @@ ${prevSeg.slice(-500)}
 ---
 
 `
+    const memResult = buildRelevantMemory(seg, localGeneratedWorldbook)
+    currentMemoryStats.value = { matchedCount: memResult.matchedCount, totalCount: memResult.totalCount, estimatedChars: memResult.estimatedChars }
     prompt += `这是当前你对该作品的记忆：
-${JSON.stringify(localGeneratedWorldbook, null, 2)}
+${memResult.context}
 
 `
   }
@@ -1731,6 +1807,11 @@ const progressPct = computed(() =>
           </div>
           <div class="h-2 bg-zinc-950 rounded-full overflow-hidden border border-white/5 shadow-inner">
             <div class="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 transition-all duration-300 animate-pulse" :style="{ width: progressPct + '%' }" />
+          </div>
+
+          <!-- Memory Stats -->
+          <div v-if="processing && currentMemoryStats" class="text-[10px] text-zinc-500 font-mono">
+            记忆：{{ currentMemoryStats.matchedCount }}/{{ currentMemoryStats.totalCount }} 条命中 · {{ currentMemoryStats.estimatedChars.toLocaleString() }} 字符
           </div>
 
           <!-- Prompt vs Response Grid -->
