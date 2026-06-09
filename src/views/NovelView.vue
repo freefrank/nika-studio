@@ -30,7 +30,7 @@ const enablePlotOutline = ref(true)
 const enableLiteraryStyle = ref(false)
 const currentPrompt = ref('')
 const currentResponse = ref('')
-const currentMemoryStats = ref<{ matchedCount: number; totalCount: number; estimatedChars: number } | null>(null)
+const currentMemoryStats = ref<{ matchedCount: number; totalCount: number; estimatedChars: number; promptChars: number; trimmed: boolean } | null>(null)
 
 const localGeneratedWorldbookRef = ref<any>({})
 const hasSavedState = ref(false)
@@ -870,20 +870,26 @@ function extractWorldbookDataByRegex(jsonString: string): any {
   return result
 }
 
-const RELEVANT_MEMORY_CHAR_LIMIT = 12000
+const RELEVANT_MEMORY_CHAR_LIMIT = 8000
+const PROMPT_CHAR_LIMIT = 18000
+const PROMPT_ABORT_CHAR_LIMIT = 22000
+const JSON_FIX_INPUT_CHAR_LIMIT = 16000
 
 interface RelevantMemoryResult {
   context: string
   matchedCount: number
   totalCount: number
   estimatedChars: number
+  trimmed: boolean
 }
 
-function buildRelevantMemory(seg: string, localGeneratedWorldbook: any): RelevantMemoryResult {
-  // Build flat list of all entries with their match score
+function buildRelevantMemory(seg: string, localGeneratedWorldbook: any, charLimit = RELEVANT_MEMORY_CHAR_LIMIT): RelevantMemoryResult {
   type EntryCandidate = { category: string; name: string; entry: any; score: number }
   const candidates: EntryCandidate[] = []
+  const categoryCounts: Record<string, number> = {}
+  const matchedSummary: Record<string, string[]> = {}
   let totalCount = 0
+  const effectiveCharLimit = Math.max(0, Math.min(RELEVANT_MEMORY_CHAR_LIMIT, charLimit))
 
   for (const category in localGeneratedWorldbook) {
     const cat = localGeneratedWorldbook[category]
@@ -892,62 +898,82 @@ function buildRelevantMemory(seg: string, localGeneratedWorldbook: any): Relevan
       const entry = cat[name]
       if (typeof entry !== 'object' || entry === null) continue
       totalCount++
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1
 
-      // Score: name match = 2, each keyword match = 1
       let score = 0
-      if (seg.includes(name)) score += 2
+      if (name && seg.includes(name)) score += 8
       const keywords: string[] = Array.isArray(entry['关键词']) ? entry['关键词'] : []
       for (const kw of keywords) {
-        if (kw && seg.includes(kw)) score += 1
+        const trimmedKw = typeof kw === 'string' ? kw.trim() : ''
+        if (!trimmedKw || trimmedKw.length < 2) continue
+        if (seg.includes(trimmedKw)) score += 3
       }
+
+      // Keep long-running global summaries available without forcing the full worldbook back in.
+      if (score === 0 && (category === '剧情大纲' || category === '文风配置')) {
+        score = 1
+      }
+
+      if (score > 0) {
+        if (!matchedSummary[category]) matchedSummary[category] = []
+        if (matchedSummary[category].length < 3) matchedSummary[category].push(name)
+      }
+
       candidates.push({ category, name, entry, score })
     }
   }
 
-  // Sort: matched first (score > 0), then by score desc
   candidates.sort((a, b) => b.score - a.score)
 
-  // Build global index (always included, just names)
-  const indexByCategory: Record<string, string[]> = {}
-  for (const c of candidates) {
-    if (!indexByCategory[c.category]) indexByCategory[c.category] = []
-    indexByCategory[c.category].push(c.name)
-  }
-  const globalIndex = Object.entries(indexByCategory)
+  const categorySummary = Object.entries(categoryCounts)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([cat, count]) => `${cat}: ${count} 条`)
+    .join('\n')
+  const matchedSection = Object.entries(matchedSummary)
+    .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([cat, names]) => `${cat}: ${names.join('、')}`)
     .join('\n')
-  const indexSection = `[已知条目索引]\n${globalIndex || '（暂无）'}`
 
-  // Fill matched entries up to char limit
+  let context = `[已知条目统计]\n${categorySummary || '（暂无）'}`
+  if (matchedSection) {
+    context += `\n\n[当前分片命中]\n${matchedSection}`
+  }
+
   const matched: EntryCandidate[] = []
-  let usedChars = indexSection.length
+  let usedChars = context.length
+  let trimmed = false
 
   for (const c of candidates) {
     if (c.score === 0) break
-    const serialized = JSON.stringify({ [c.category]: { [c.name]: c.entry } })
-    if (usedChars + serialized.length > RELEVANT_MEMORY_CHAR_LIMIT) continue
+    const serialized = JSON.stringify({ [c.category]: { [c.name]: c.entry } }, null, 2)
+    if (usedChars + serialized.length > effectiveCharLimit) {
+      trimmed = true
+      continue
+    }
     matched.push(c)
     usedChars += serialized.length
   }
 
-  // Build output object with only matched entries
   const relevant: any = {}
   for (const c of matched) {
     if (!relevant[c.category]) relevant[c.category] = {}
     relevant[c.category][c.name] = c.entry
   }
 
-  const context = indexSection + '\n\n[相关条目]\n' +
+  context += '\n\n[相关条目]\n' +
     (matched.length > 0 ? JSON.stringify(relevant, null, 2) : '（当前分片无匹配条目）')
 
-  return { context, matchedCount: matched.length, totalCount, estimatedChars: usedChars }
+  if (matched.length < Object.values(matchedSummary).reduce((sum, names) => sum + names.length, 0)) {
+    trimmed = true
+  }
+
+  return { context, matchedCount: matched.length, totalCount, estimatedChars: context.length, trimmed }
 }
 
 function buildPrompt(seg: string, index: number, segments: string[], localGeneratedWorldbook: any): string {
   const jsonTemplate = generateMainPromptJsonTemplate()
   const enabledCategoriesDesc = getEnabledCategoriesDescription()
-
-  let prompt = `你是专业的小说世界书生成专家。请仔细阅读提供的小说内容，提取其中的关键信息，生成高质量的世界书条目。
+  const header = `你是专业的小说世界书生成专家。请仔细阅读提供的小说内容，提取其中的关键信息，生成高质量的世界书条目。
 
 ## 重要要求
 1. **必须基于提供的具体小说内容**，不要生成通用模板
@@ -971,36 +997,34 @@ ${jsonTemplate}
 
 `
 
+  let previousSection = ''
+  let memorySection = ''
+
   if (index > 0) {
     const prevSeg = segments[index - 1]
-    prompt += `这是你上一次阅读的结尾部分：
+    previousSection = `这是你上一次阅读的结尾部分：
 ---
 ${prevSeg.slice(-500)}
 ---
 
 `
-    const memResult = buildRelevantMemory(seg, localGeneratedWorldbook)
-    currentMemoryStats.value = { matchedCount: memResult.matchedCount, totalCount: memResult.totalCount, estimatedChars: memResult.estimatedChars }
-    prompt += `这是当前你对该作品的记忆：
-${memResult.context}
-
-`
   }
 
-  prompt += `这是你现在阅读的部分：
+  const segmentSection = `这是你现在阅读的部分：
 ---
 ${seg}
 ---
 
 `
 
+  let modeSection = ''
   if (index === 0) {
-    prompt += `现在开始分析小说内容，请专注于提取文中实际出现的信息：
+    modeSection = `现在开始分析小说内容，请专注于提取文中实际出现的信息：
 
 `
   } else {
     if (incrementalMode.value) {
-      prompt += `请基于新内容**增量更新**世界书，采用**点对点覆盖**模式：
+      modeSection = `请基于新内容**增量更新**世界书，采用**点对点覆盖**模式：
 
 **增量输出规则**：
 1. **只输出本次需要变更的条目**，不要输出完整的世界书
@@ -1014,7 +1038,7 @@ ${seg}
 
 `
     } else {
-      prompt += `请基于新内容**累积补充**世界书，注意以下要点：
+      modeSection = `请基于新内容**累积补充**世界书，注意以下要点：
 
 **重要规则**：
 1. **已有角色**：如果角色已存在，请在原有内容基础上**追加新信息**，不要删除或覆盖已有描述
@@ -1027,7 +1051,57 @@ ${seg}
     }
   }
 
-  prompt += `请直接输出JSON格式的结果，不要添加任何代码块标记或解释文字。`
+  const footer = `请直接输出JSON格式的结果，不要添加任何代码块标记或解释文字。`
+
+  let memResult: RelevantMemoryResult | null = null
+  if (index > 0) {
+    const reservedChars = header.length + previousSection.length + segmentSection.length + modeSection.length + footer.length
+    const memoryBudget = Math.max(0, PROMPT_CHAR_LIMIT - reservedChars)
+    memResult = buildRelevantMemory(seg, localGeneratedWorldbook, memoryBudget)
+    memorySection = `这是当前你对该作品的记忆：
+${memResult.context}
+
+`
+  }
+
+  let prompt = header + previousSection + memorySection + segmentSection + modeSection + footer
+
+  if (index > 0 && prompt.length > PROMPT_CHAR_LIMIT) {
+    previousSection = ''
+    const reservedChars = header.length + segmentSection.length + modeSection.length + footer.length
+    memResult = buildRelevantMemory(seg, localGeneratedWorldbook, Math.max(0, PROMPT_CHAR_LIMIT - reservedChars))
+    memorySection = `这是当前你对该作品的记忆：
+${memResult.context}
+
+`
+    prompt = header + memorySection + segmentSection + modeSection + footer
+  }
+
+  if (index > 0 && prompt.length > PROMPT_CHAR_LIMIT) {
+    previousSection = ''
+    memResult = buildRelevantMemory(seg, localGeneratedWorldbook, 0)
+    memorySection = `这是当前你对该作品的记忆：
+${memResult.context}
+
+`
+    prompt = header + memorySection + segmentSection + modeSection + footer
+  }
+
+  currentMemoryStats.value = memResult
+    ? {
+        matchedCount: memResult.matchedCount,
+        totalCount: memResult.totalCount,
+        estimatedChars: memResult.estimatedChars,
+        promptChars: prompt.length,
+        trimmed: memResult.trimmed || prompt.length > PROMPT_CHAR_LIMIT
+      }
+    : {
+        matchedCount: 0,
+        totalCount: 0,
+        estimatedChars: 0,
+        promptChars: prompt.length,
+        trimmed: false
+      }
 
   return prompt
 }
@@ -1285,6 +1359,9 @@ async function generateWorldbook() {
     try {
       let json = ''
       currentPrompt.value = buildPrompt(seg, idx, segments, localGeneratedWorldbook)
+      if (currentPrompt.value.length > PROMPT_ABORT_CHAR_LIMIT) {
+        throw new Error(`Prompt 已超过安全上限 (${currentPrompt.value.length.toLocaleString()} / ${PROMPT_ABORT_CHAR_LIMIT.toLocaleString()} 字符)，已停止本分片以避免异常 token 消耗。请降低分段字数或清理过大的世界书条目。`)
+      }
       currentResponse.value = ''
       
       await streamChat(cfg, [{ role: 'user', content: currentPrompt.value }], d => {
@@ -1328,6 +1405,9 @@ async function generateWorldbook() {
             if (regexExtractedData && Object.keys(regexExtractedData).length > 0) {
               memoryUpdate = regexExtractedData
             } else {
+              const fixInput = cleanResponse.length > JSON_FIX_INPUT_CHAR_LIMIT
+                ? cleanResponse.slice(0, JSON_FIX_INPUT_CHAR_LIMIT) + '\n\n[已截断：原始错误 JSON 过长，仅发送前部片段进行修复，避免二次 token 暴涨]'
+                : cleanResponse
               // Format fixing prompt
               const fixPrompt = `你是专业的JSON修复专家。请将下面“格式错误的JSON文本”修复为严格有效、可被 JavaScript 的 JSON.parse() 直接解析的JSON。
 
@@ -1359,8 +1439,11 @@ ${generateFixPromptJsonStructure()}
 ${secondError.message}
 
 ## 需要修复的JSON文本
-${cleanResponse}
+${fixInput}
 `
+              if (fixPrompt.length > PROMPT_ABORT_CHAR_LIMIT) {
+                throw new Error(`JSON 修复 Prompt 已超过安全上限 (${fixPrompt.length.toLocaleString()} / ${PROMPT_ABORT_CHAR_LIMIT.toLocaleString()} 字符)，已停止自动修复以避免异常 token 消耗。`)
+              }
               let fixedJson = ''
               await streamChat(cfg, [{ role: 'user', content: fixPrompt }], d => {
                 fixedJson += d
@@ -1811,7 +1894,10 @@ const progressPct = computed(() =>
 
           <!-- Memory Stats -->
           <div v-if="processing && currentMemoryStats" class="text-[10px] text-zinc-500 font-mono">
-            记忆：{{ currentMemoryStats.matchedCount }}/{{ currentMemoryStats.totalCount }} 条命中 · {{ currentMemoryStats.estimatedChars.toLocaleString() }} 字符
+            Prompt：{{ currentMemoryStats.promptChars.toLocaleString() }} 字符 ·
+            记忆：{{ currentMemoryStats.matchedCount }}/{{ currentMemoryStats.totalCount }} 条命中 ·
+            {{ currentMemoryStats.estimatedChars.toLocaleString() }} 字符
+            <span v-if="currentMemoryStats.trimmed" class="text-amber-400"> · 已裁剪</span>
           </div>
 
           <!-- Prompt vs Response Grid -->
